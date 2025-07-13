@@ -33,7 +33,8 @@ RA_Input::RA_Input(string file_name)
   gamesData.resize(games);
   distanceBetweenArenas.resize(arenas, vector<float>(arenas));
   distanceBetweenArenasAndReferee.resize(arenas, vector<float>(referees));
-  
+  travelTimeBetweenArenas.resize(arenas, vector<float>(arenas));
+  travelTimeBetweenArenasAndReferee.resize(arenas, vector<float>(referees));
 
   // read divisions
   is.ignore(MAX_DIM, '\n');           // ignore the first line (header)
@@ -138,6 +139,26 @@ void RA_Input::ComputeDistances()
   }
 }
 
+// Function that fill the travel time matrices, using constant speed
+void RA_Input::ComputeTravelTimes()
+{
+  const float speed = 60.0;
+  for(unsigned a1 = 0; a1 < arenas; a1++)
+  {
+    for(unsigned a2 = 00; a2 < arenas; a2++)
+    {
+      travelTimeBetweenArenas[a1][a2] = distanceBetweenArenas[a1][a2] / speed;
+    }
+  }
+  for(unsigned r = 0; r < referees; r++)
+  {
+    for(unsigned a = 0; a < arenas; a++)
+    {
+      travelTimeBetweenArenasAndReferee[r][a] = distanceBetweenArenasAndReferee[r][a] / speed;
+    }
+  }
+}
+
 ostream& operator<<(ostream& os, const RA_Input& in)
 {
  
@@ -213,6 +234,38 @@ RA_Output& RA_Output::operator=(const RA_Output& out)
   return *this;
 }
 
+bool RA_Output::Feasibility() const
+{
+  return MinimumReferees() && FeasibleDistance() && RefereeAvailability();
+}
+
+// The number of mandatory referees must always be assigned to each game.
+bool RA_Output::MinimumReferees() const
+{
+  for (unsigned g = 0; g < in.Games(); ++g) {
+    const auto& game = in.gamesData[g];
+    unsigned assigned_referees = gameAssignments[g].size();
+
+    // Cerca la divisione con il codice giusto
+    unsigned min_referees = 1; // valore di default
+    for (const auto& div : in.divisionsData) {
+      if (div.code == game.division_code) {
+        min_referees = div.min_referees;
+        break;
+      }
+    }
+
+    if (assigned_referees < min_referees) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool RA_Output::FeasibleDistance() const 
+{};
+
+
 void RA_Output::AssignRefereetoGame(unsigned game_id, const string& referee_code)
 {
   gameAssignments[game_id].push_back(referee_code);
@@ -221,6 +274,14 @@ void RA_Output::AssignRefereetoGame(unsigned game_id, const string& referee_code
 const vector<string>& RA_Output::AssignedReferees(unsigned game_id) const
 {
   return gameAssignments[game_id];
+}
+
+unsigned RA_Output::ComputeCost() const
+{
+  return ComputeExperienceNeeded() + ComputeGameDistribution() +
+         ComputeMinDistanceCost() +
+         ComputeAssignmentFrequency() + ComputeRefereeCompatibility() +
+         ComputeTeamCompatibilityCost();
 }
 
 void RA_Output::Reset()

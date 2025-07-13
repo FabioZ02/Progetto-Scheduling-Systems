@@ -30,7 +30,10 @@ public:
   // Distance matrices
   vector<vector<float>> distanceBetweenArenas;
   vector<vector<float>> distanceBetweenArenasAndReferee;
+  vector<vector<float>> travelTimeBetweenArenas;
+  vector<vector<float>> travelTimeBetweenArenasAndReferee;
   void ComputeDistances();
+  void ComputeTravelTimes();
 
   // Division Data structure
   struct Division {
@@ -90,9 +93,24 @@ class RA_Output
 public:
   RA_Output(const RA_Input& i);
   RA_Output& operator=(const RA_Output& out);
-
+  float DistanceArenas(unsigned a1, unsigned a2) const { return in.DistanceBetweenArenas(a1, a2); }
+  float DistanceArenasAndReferee(unsigned r, unsigned a) const { return in.DistanceBetweenArenasAndReferee(r, a); }
+  float TravelTimeArenas(unsigned a1, unsigned a2) const { return in.travelTimeBetweenArenas[a1][a2]; }
+  float TravelTimeArenasAndReferee(unsigned r, unsigned a) const { return in.travelTimeBetweenArenasAndReferee[a][r]; }
+  bool MinimumReferees() const;
+  bool FeasibleDistance() const;
+  bool RefereeAvailability() const;
+  bool Feasibility() const;
   void AssignRefereetoGame(unsigned game_id, const string& referee_code);
   const vector<string>& AssignedReferees(unsigned game_id) const;
+  unsigned ComputeCost() const;
+  unsigned ComputeExperienceNeeded() const;
+  unsigned ComputeGameDistribution() const;
+  unsigned ComputeMinDistanceCost() const;
+  unsigned CoputeOptionalRefereee() const;
+  unsigned ComputeAssignmentFrequency() const;
+  unsigned ComputeRefereeCompatibility() const;
+  unsigned ComputeTeamCompatibilityCost() const;
   void Reset();
   void Dump(ostream& os) const;
 private:
