@@ -21,8 +21,8 @@ public:
   unsigned Games() const { return games; }
   
   // Getters for the distance matrices
-  unsigned DistanceBetweenArenas(unsigned a1, unsigned a2) const {return distanceBetweenArenas[a1][a2];}
-  unsigned DistanceBetweenArenasAndReferee(unsigned a, unsigned r) const {return distanceBetweenArenasAndReferee[a][r];}
+  float DistanceBetweenArenas(unsigned a1, unsigned a2) const {return distanceBetweenArenas[a1][a2];}
+  float DistanceBetweenArenasAndReferee(unsigned a, unsigned r) const {return distanceBetweenArenasAndReferee[a][r];}
 
 
 public:
