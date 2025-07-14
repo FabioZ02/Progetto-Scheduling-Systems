@@ -77,7 +77,7 @@ public:
   float TravelTimeBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeTravelTimeBetweenArenasAndReferee(a, r);}
 
   
-private:
+public:
   unsigned divisions, referees, arenas, teams, games;
 
   // probabilmente vanno nell'output
