@@ -101,11 +101,10 @@ public:
   bool RefereeAvailability() const;
   bool Feasibility() const;
 
-  void AssignRefereetoGame(unsigned game_id, const string& referee_code);
+  void AssignRefereeToGame(unsigned game_id, const string& referee_code);
   const vector<string>& AssignedReferees(unsigned game_id) const;
 
   unsigned ComputeCost() const;
-  
 
   void Reset();
   void Dump(ostream& os) const;
@@ -120,12 +119,12 @@ private:
   float TravelTimeBetweenArenasAndReferee(RA_Input::Arena a, RA_Input::Referee r) const { return in.TravelTimeBetweenArenasAndReferee(a, r); }
 
 
-  unsigned ComputeExperienceNeeded() const;
-  unsigned ComputeGameDistribution() const;
-  unsigned ComputeMinDistanceCost() const;
-  unsigned CoputeOptionalRefereee() const;
-  unsigned ComputeAssignmentFrequency() const;
-  unsigned ComputeRefereeCompatibility() const;
-  unsigned ComputeTeamCompatibilityCost() const;
+  // unsigned ComputeExperienceNeeded() const;
+  // unsigned ComputeGameDistribution() const;
+  // unsigned ComputeMinDistanceCost() const;
+  // unsigned CoputeOptionalRefereee() const;
+  // unsigned ComputeAssignmentFrequency() const;
+  // unsigned ComputeRefereeCompatibility() const;
+  // unsigned ComputeTeamCompatibilityCost() const;
 };
 #endif

@@ -36,113 +36,191 @@ tm parseTime(const string& timeStr) {
     return time;
 }
 
-RA_Input::RA_Input(string file_name){  
-  const unsigned MAX_DIM = 100;
-  unsigned d,r,a,t,g;
-  string incompatible_referee, incompatible_teams, unavailable_date, unavailable_time;
-  char ch, buffer[MAX_DIM];
+string Trim(const string& str) {
+  size_t first = str.find_first_not_of(" \t\n\r");
+  if (string::npos == first) return "";
+  size_t last = str.find_last_not_of(" \t\n\r");
+  return str.substr(first, (last - first + 1));
+}
 
-  ifstream is(file_name);
-  if(!is)
-  {
-    cerr << "Cannot open input file " <<  file_name << endl;
-    exit(1);
-  }
-  
-  is >> buffer >> ch >> divisions >> ch;
-  is >> buffer >> ch >> referees >> ch;
-  is >> buffer >> ch >> arenas >> ch;
-  is >> buffer >> ch >> teams >> ch;
-  is >> buffer >> ch >> games >> ch;
-
-  
-  divisionsData.resize(divisions);
-  refereesData.resize(referees);
-  arenasData.resize(arenas);
-  teamsData.resize(teams);
-  gamesData.resize(games);
-
-  // read divisions
-  is.ignore(MAX_DIM, '\n');           // ignore the first line (header)
-  for (d = 0; d < divisions; d++)
-  {
-    is >> divisionsData[d].code >> ch; // read "D1"
-    is.ignore(MAX_DIM, ':');           // ignore the ':' character
-    is >> divisionsData[d].min_referees >> ch; // read "MinReferees,"
-    is >> divisionsData[d].max_referees >> ch; // read "MaxReferees,"
-    is >> divisionsData[d].level >> ch; // read "Level,"
-    is >> divisionsData[d].teams >> ch; // read "Teams"
-  }
-
-  // read referees
-  is.ignore(MAX_DIM, '\n');           // ignore the first line (header)
-  for (r = 0; r < referees; r++)
-  {
-    is >> refereesData[r].code >> ch; // read "R1"
-    is >> refereesData[r].level >> ch; // read "Level,"
-    is.ignore(MAX_DIM, '(');           // ignore the '(' character
-    is >> refereesData[r].coordinates.first >> ch; // read "Coordinates"
-    is >> refereesData[r].coordinates.second >> ch; // read "Coordinates"
-    is.ignore(MAX_DIM, ')');           // ignore the ')' character
-    is >> refereesData[r].experience >> ch; // read "Experience,"
-    is.ignore(MAX_DIM, '[');            // ignore the '[' character
-    while (is.peek() != ']')            // read incompatible referees
-    {
-      is >> incompatible_referee >> ch; // read "IncompatibleReferee,"
-      refereesData[r].incompatible_referees.push_back(incompatible_referee);
+RA_Input::RA_Input(string file_name) {
+    ifstream is(file_name);
+    if (!is) {
+        cerr << "Cannot open input file " << file_name << endl;
+        exit(1);
     }
-    is.ignore(MAX_DIM, ']');            // ignore the ']' character
-    is.ignore(MAX_DIM, '[');            // ignore the '[' character
-    while (is.peek() != ']')            // read incompatible teams
-    {
-      is >> incompatible_teams >> ch; // read "IncompatibleTeam,"
-      refereesData[r].incompatible_teams.push_back(incompatible_teams);
+
+    // Read starting parameters
+    string dummy;
+    char ch;
+    is >> dummy >> ch >> divisions >> ch;
+    is >> dummy >> ch >> referees >> ch;
+    is >> dummy >> ch >> arenas >> ch;
+    is >> dummy >> ch >> teams >> ch;
+    is >> dummy >> ch >> games >> ch;
+
+    divisionsData.resize(divisions);
+    refereesData.resize(referees);
+    arenasData.resize(arenas);
+    teamsData.resize(teams);
+    gamesData.resize(games);
+    
+    string line;
+    stringstream ss(line);
+
+    // === Leggi DIVISIONS ===
+    while (getline(is, line)) {
+        if (line.find("DIVISIONS") != string::npos) break;
     }
-    is.ignore(MAX_DIM, ']');            // ignore the ']' character
-    is.ignore(MAX_DIM, '[');            // ignore the '[' character
-    while (is.peek() != ']')            // read unavailabilities
-    {
-      is >> unavailable_date >> ch; // read "UnavailableDate,"
-      is >> unavailable_time >> ch; // read "UnavailableTime,"
-      refereesData[r].unavailabilities.push_back(make_pair(unavailable_date, unavailable_time));
+    for (unsigned d = 0; d < divisions; ++d) {
+        if (!getline(is, line) || line.empty()) continue;
+        
+        stringstream ss(line);
+        string code;
+        getline(ss, code, ':');
+        divisionsData[d].code = Trim(code);
+        
+        char comma;
+        ss >> divisionsData[d].min_referees >> comma
+            >> divisionsData[d].max_referees >> comma
+            >> divisionsData[d].level >> comma
+            >> divisionsData[d].teams;
+    };
+
+    // === Leggi REFEREES ===
+    while (getline(is, line)) {
+        if (!line.empty() && line[0] == 'R' && line.find('%') != string::npos) break;
     }
-    is.ignore(MAX_DIM, ']');            // ignore the ']' character
-  }
+    for (unsigned r = 0; r < referees; ++r) {
+        if (!getline(is, line) || line.empty()) continue;
+        stringstream ss(line);
+        string token;
+        
+        // Read code
+        getline(ss, token, ','); // Read until first comma
+        refereesData[r].code = token;
+        
+        // Read level
+        getline(ss, token, ',');
+        refereesData[r].level = stoi(token);
+        
+        // Read coordinates
+        ss.ignore(); // Skip space after comma
+        getline(ss, token, ')'); // Read until closing parenthesis
+        token.erase(remove(token.begin(), token.end(), '('), token.end()); // Remove '('
+        stringstream coord_ss(token);
+        coord_ss >> refereesData[r].coordinates.first;
+        coord_ss.ignore(); // Skip comma
+        coord_ss >> refereesData[r].coordinates.second;
+        ss.ignore(); // Skip comma after coordinates
+        
+        // Read experience
+        getline(ss, token, ',');
+        refereesData[r].experience = stoi(token);
+        
+        // Read incompatible referees
+        ss.ignore(); // Skip space after comma
+        getline(ss, token, ']'); // Read until closing bracket
+        token.erase(remove(token.begin(), token.end(), '['), token.end()); // Remove '['
+        if (!token.empty()) {
+            stringstream ref_ss(token);
+            string ref_code;
+            while (getline(ref_ss, ref_code, ',')) {
+                if (!ref_code.empty()) {
+                    refereesData[r].incompatible_referees.push_back(ref_code);
+                }
+            }
+        }
+        ss.ignore(); // Skip comma after incompatible referees
+        
+        // Read incompatible teams
+        ss.ignore(); // Skip space after comma
+        getline(ss, token, ']'); // Read until closing bracket
+        token.erase(remove(token.begin(), token.end(), '['), token.end()); // Remove '['
+        if (!token.empty()) {
+            stringstream team_ss(token);
+            string team_code;
+            while (getline(team_ss, team_code, ',')) {
+                if (!team_code.empty()) {
+                    refereesData[r].incompatible_teams.push_back(team_code);
+                }
+            }
+        }
+        ss.ignore(); // Skip comma after incompatible teams
+        
+        // Read unavailabilities
+        ss.ignore(); // Skip space after comma
+        getline(ss, token, ']'); // Read until closing bracket
+        token.erase(remove(token.begin(), token.end(), '['), token.end()); // Remove '['
+        if (!token.empty()) {
+            stringstream unavail_ss(token);
+            string date_time;
+            while (getline(unavail_ss, date_time, ',')) {
+                if (!date_time.empty()) {
+                    size_t space_pos = date_time.find(' ');
+                    if (space_pos != string::npos) {
+                        string date = date_time.substr(0, space_pos);
+                        string time = date_time.substr(space_pos + 1);
+                        refereesData[r].unavailabilities.emplace_back(date, time);
+                    }
+                }
+            }
+        }
+    }
 
-  // read Arenas
-  is.ignore(MAX_DIM, '\n');             // ignore rest of the line
-  for(a=0; a < arenas; a++)
-  {
-    is >> arenasData[a].code >> ch;
-    is.ignore(MAX_DIM, '(');
-    is >> arenasData[a].coordinates.first >> ch;
-    is >> arenasData[a].coordinates.second >> ch;
-    is.ignore(MAX_DIM, ')');
-  }
+    // === Leggi ARENAS ===
+    while (getline(is, line)) {
+        if (line.find("ARENAS") != string::npos) break;
+    }
+    for (unsigned a = 0; a < arenas; ++a) {
+        if (!getline(is, line) || line.empty()) continue;
+        
+        stringstream ss(line);
+        ss >> arenasData[a].code;
+        
+        ss.ignore(); // Ignora lo spazio
+        string coord_str;
+        getline(ss, coord_str, ')');
+        coord_str.erase(remove(coord_str.begin(), coord_str.end(), '('), coord_str.end());
+        stringstream coord_ss(coord_str);
+        coord_ss >> arenasData[a].coordinates.first;
+        coord_ss.ignore(); // Ignora la virgola
+        coord_ss >> arenasData[a].coordinates.second;
+    }
 
-  // read teams
-  is.ignore(MAX_DIM, '\n');
-  for(t=0; t < teams; t++)
-  {
-    is >> teamsData[t].code >> ch;
-    is >> teamsData[t].division_code >> ch;
-  }
+    // === Leggi TEAMS ===
+    while (getline(is, line)) {
+        if (line.find("TEAMS") != string::npos) break;
+    }
+    for (unsigned t = 0; t < teams; ++t) {
+        if (!getline(is, line) || line.empty()) continue;
+        
+        stringstream ss(line);
+        ss >> teamsData[t].code >> teamsData[t].division_code;
+    }
 
-  // read Games
-  is.ignore(MAX_DIM, '\n');
-  for(g=0; g < games; g++)
-  {
-    is >> gamesData[g].homeTeam_code >> ch;
-    is >> gamesData[g].guestTeam_code >> ch;
-    is >> gamesData[g].division_code >> ch;
-    string dateStr, timeStr;
-    is >> dateStr >> ch;
-    is >> timeStr >> ch;
-    gamesData[g].date = parseDate(dateStr);
-    gamesData[g].time = parseTime(timeStr);
-    is >> gamesData[g].arena_code >> ch;
-    is >> gamesData[g].experience_required >> ch;
-  }
+    // === Leggi GAMES ===
+    while (getline(is, line)) {
+        if (line.find("GAMES") != string::npos) break;
+    }
+    for (unsigned g = 0; g < games; ++g) {
+        while(getline(is, line)) {
+            if (!line.empty()) break; // Skip empty lines
+        }
+        
+        stringstream ss(line);
+        ss >> gamesData[g].homeTeam_code
+            >> gamesData[g].guestTeam_code
+            >> gamesData[g].division_code;
+        
+        string date_str, time_str;
+        ss >> date_str >> time_str;
+        gamesData[g].date = parseDate(date_str);
+        gamesData[g].time = parseTime(time_str);
+        
+        ss >> gamesData[g].arena_code >> gamesData[g].experience_required;
+    }
+
 }
 
 // Function that computes the distance between two arenas
@@ -240,221 +318,233 @@ ostream& operator<<(ostream& os, const RA_Input& in){
 
 /////////////////////////////////// RA_Output Implementation //////////////////////////////////////
 
-// Builder
-RA_Output::RA_Output(const RA_Input& my_in): in(my_in){
-  gameAssignments.resize(in.Games());
-} 
+// // Builder
+// RA_Output::RA_Output(const RA_Input& my_in): in(my_in){
+//   gameAssignments.resize(in.Games());
+// } 
 
-RA_Output& RA_Output::operator=(const RA_Output& out){
-  gameAssignments = out.gameAssignments;
-  return *this;
-}
+// RA_Output& RA_Output::operator=(const RA_Output& out){
+//   gameAssignments = out.gameAssignments;
+//   return *this;
+// }
 
-// The number of mandatory referees must always be assigned to each game.
-bool RA_Output::MinimumReferees() const{
-  for (unsigned g = 0; g < in.Games(); ++g) {
-    const auto& game = in.gamesData[g];
-    // DA VEDERE SE IL NUMERO VARIA IN BASE ALLA DIVISIONE
-    unsigned assigned_referees = gameAssignments[g].size();
+// // The number of mandatory referees must always be assigned to each game.
+// bool RA_Output::MinimumReferees() const{
+//   for (unsigned g = 0; g < in.Games(); ++g) {
+//     const auto& game = in.gamesData[g];
+//     // DA VEDERE SE IL NUMERO VARIA IN BASE ALLA DIVISIONE
+//     unsigned assigned_referees = gameAssignments[g].size();
 
-    // Find the minimum number of referees required for the division of the game
-    unsigned min_referees = 1; // default value
-    for (const auto& div : in.divisionsData) {
-      if (div.code == game.division_code) {
-        min_referees = div.min_referees;
-        break;
-      }
-    }
+//     // Find the minimum number of referees required for the division of the game
+//     unsigned min_referees = 1; // default value
+//     for (const auto& div : in.divisionsData) {
+//       if (div.code == game.division_code) {
+//         min_referees = div.min_referees;
+//         break;
+//       }
+//     }
 
-    if (assigned_referees < min_referees) {
-      return false;
-    }
-  }
-  return true;
-}
+//     if (assigned_referees < min_referees) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }
 
-bool RA_Output::FeasibleDistance() const {
-  // For each ref, check the game assignment feasibility
-  for (const auto& referee : in.refereesData) {
+// bool RA_Output::FeasibleDistance() const {
+//   // For each ref, check the game assignment feasibility
+//   for (const auto& referee : in.refereesData) {
     
-    // Find all games assigned to a ref
-    vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
-    for (unsigned g = 0; g < in.Games(); ++g) {
-      for (const auto& ref_code : gameAssignments[g]) {
-        // DA CONTROLLARE COME FARE IL CONFRONTO CON I CODICI (SE HO VETTORE == STRINGA)
-        if (ref_code == referee.code) {
-          assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
-        }
-      }
-    }
+//     // Find all games assigned to a ref
+//     vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
+//     for (unsigned g = 0; g < in.Games(); ++g) {
+//       for (const auto& ref_code : gameAssignments[g]) {
+//         // DA CONTROLLARE COME FARE IL CONFRONTO CON I CODICI (SE HO VETTORE == STRINGA)
+//         if (ref_code == referee.code) {
+//           assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
+//         }
+//       }
+//     }
 
-    //Sort assigned games by date and time
-    sort(assignedGames.begin(), assignedGames.end(), [](const auto& a, const auto& b)) {
-      time_t ta = mktime(const_cast<tm*>(&a.first));
-      time_t tb = mktime(const_cast<tm*>(&b.first));
-      if (ta != tb) return ta < tb;
-      // If date is the same, compare time
-      time_t tma = mktime(const_cast<tm*>(&a.second.first));
-      time_t tmb = mktime(const_cast<tm*>(&b.second.first));
-      return tma < tmb;
-    };
+//     //Sort assigned games by date and time
+//     sort(assignedGames.begin(), assignedGames.end(), [](const auto& a, const auto& b) {
+//       time_t ta = mktime(const_cast<tm*>(&a.first));
+//       time_t tb = mktime(const_cast<tm*>(&b.first));
+//       if (ta != tb) return ta < tb;
+//       // If date is the same, compare time
+//       time_t tma = mktime(const_cast<tm*>(&a.second.first));
+//       time_t tmb = mktime(const_cast<tm*>(&b.second.first));
+//       return tma < tmb;
+//     });
 
-    // Check distance between consecutive games
-    for (size_t i = 1; i < assignedGames.size(); ++i) {
-      unsigned prev_game = assignedGames[i - 1].second.second;
-      unsigned curr_game = assignedGames[i].second.second;
-      const auto& prev = in.gamesData[prev_game];
-      const auto& curr = in.gamesData[curr_game];
+//     // Check distance between consecutive games
+//     for (size_t i = 1; i < assignedGames.size(); ++i) {
+//       unsigned prev_game = assignedGames[i - 1].second.second;
+//       unsigned curr_game = assignedGames[i].second.second;
+//       const auto& prev = in.gamesData[prev_game];
+//       const auto& curr = in.gamesData[curr_game];
 
-      // Compute end time of the previous game
-      tm end_prev = prev.time;
-      end_prev.tm_hour += 2;
-      mktime(&end_prev); // normalizza
+//       // Compute end time of the previous game
+//       tm end_prev = prev.time;
+//       end_prev.tm_hour += 2;
+//       mktime(&end_prev); // normalizza
 
-      // Compute strart time of next_game
-      tm start_curr = curr.time;
+//       // Compute strart time of next_game
+//       tm start_curr = curr.time;
 
-      // Compute difference in minutes between the end of the previous game and the start of the current game
-      tm prev_date = prev.date;
-      tm curr_date = curr.date;
-      prev_date.tm_hour = end_prev.tm_hour;
-      prev_date.tm_min = end_prev.tm_min;
-      time_t t_end_prev = mktime(&prev_date);
-      curr_date.tm_hour = start_curr.tm_hour;
-      curr_date.tm_min = start_curr.tm_min;
-      time_t t_start_curr = mktime(&curr_date);
+//       // Compute difference in minutes between the end of the previous game and the start of the current game
+//       tm prev_date = prev.date;
+//       tm curr_date = curr.date;
+//       prev_date.tm_hour = end_prev.tm_hour;
+//       prev_date.tm_min = end_prev.tm_min;
+//       time_t t_end_prev = mktime(&prev_date);
+//       curr_date.tm_hour = start_curr.tm_hour;
+//       curr_date.tm_min = start_curr.tm_min;
+//       time_t t_start_curr = mktime(&curr_date);
 
-      double minutes_between = difftime(t_start_curr, t_end_prev) / 60.0;
+//       double minutes_between = difftime(t_start_curr, t_end_prev) / 60.0;
 
-      // Compute travel time
-      const auto& prev_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                        [&](const auto& a) { return a.code == prev.arena_code; });
-      const auto& curr_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                        [&](const auto& a) { return a.code == curr.arena_code; });
-      float travel_time = in.TravelTimeBetweenArenas(prev_arena, curr_arena) * 60.0; // in minuti
+//       // Compute travel time
+//       const auto& prev_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
+//                                         [&](const auto& a) { return a.code == prev.arena_code; });
+//       const auto& curr_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
+//                                         [&](const auto& a) { return a.code == curr.arena_code; });
+//       float travel_time = in.TravelTimeBetweenArenas(prev_arena, curr_arena) * 60.0; // in minuti
 
-      if (minutes_between < travel_time) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
+//       if (minutes_between < travel_time) {
+//         return false;
+//       }
+//     }
+//   }
+//   return true;
+// }
 
-bool RA_Output::RefereeAvailability() const {
-  // For each ref, check if they are available for the assigned games
-  for (const auto& referee : in.refereesData) {
-    // Find all games assigned to a ref
-    vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
-    for (unsigned g = 0; g < in.Games(); ++g) {
-      for (const auto& ref_code : gameAssignments[g]) {
-        if (ref_code == referee.code) {
-          assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
-        }
-      }
-    }
+// bool RA_Output::RefereeAvailability() const {
+//   // For each ref, check if they are available for the assigned games
+//   for (const auto& referee : in.refereesData) {
+//     // Find all games assigned to a ref
+//     vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
+//     for (unsigned g = 0; g < in.Games(); ++g) {
+//       for (const auto& ref_code : gameAssignments[g]) {
+//         if (referee.code == ref_code) {
+//           assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
+//         }
+//       }
+//     }
 
-    // Check if the referee is available for each assigned game
-    for (const auto& game : assignedGames) {
-      const auto& game_date = game.first;
-      const auto& game_time = game.second.first;
-      unsigned game_id = game.second.second;
+//     for (const auto& ref_code : gameAssignments[0]) {
+//       cout << "ref_code = [" << ref_code << "]" << endl;
+//     }
 
-      // Check if the referee is unavailable on this date and time
-      bool available = true;
-      for (const auto& unavailability : referee.unavailabilities) {
-        tm unavailable_date = parseDate(unavailability.first);
-        tm unavailable_time = parseTime(unavailability.second);
+//     // Check if the referee is available for each assigned game
+//     for (const auto& game : assignedGames) {
+//       const auto& game_date = game.first;
+//       const auto& game_time = game.second.first;
+//       //unsigned game_id = game.second.second;
 
-        // Compare dates and times
-        if (unavailable_date.tm_year == game_date.tm_year &&
-            unavailable_date.tm_mon == game_date.tm_mon &&
-            unavailable_date.tm_mday == game_date.tm_mday &&
-            unavailable_time.tm_hour == game_time.tm_hour &&
-            unavailable_time.tm_min == game_time.tm_min) {
-          available = false;
-          break;
-        }
-      }
+//       // Check if the referee is unavailable on this date and time
+//       bool available = true;
+//       for (const auto& unavailability : referee.unavailabilities) {
+//         tm unavailable_date = parseDate(unavailability.first);
+//         tm unavailable_time = parseTime(unavailability.second);
 
-      if (!available) {
-        return false; // Referee is not available for this game
-      }
-    }
-  }
-  return true;
-}
+//         // Compare dates and times
+//         if (unavailable_date.tm_year == game_date.tm_year &&
+//             unavailable_date.tm_mon == game_date.tm_mon &&
+//             unavailable_date.tm_mday == game_date.tm_mday &&
+//             unavailable_time.tm_hour == game_time.tm_hour &&
+//             unavailable_time.tm_min == game_time.tm_min) {
+//           available = false;
+//           break;
+//         }
+//       }
 
-bool RA_Output::Feasibility() const{
-  return MinimumReferees() && FeasibleDistance() && RefereeAvailability();
-}
+//       if (!available) {
+//         return false; // Referee is not available for this game
+//       }
+//     }
+//   }
+//   return true;
+// }
 
-void RA_Output::AssignRefereetoGame(unsigned game_id, const string& referee_code){
-  //gameAssignments[game_id].push_back(referee_code);
-}
+// bool RA_Output::Feasibility() const{
+//   return MinimumReferees() && FeasibleDistance() && RefereeAvailability();
+// }
 
-const vector<string>& RA_Output::AssignedReferees(unsigned game_id) const{
-  return gameAssignments[game_id];
-}
+// void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code) {
+//   // Check if game_id is within bounds
+//   if (game_id >= gameAssignments.size()) {
+//     cerr << "Error: game_id out of bounds" << endl;
+//     return;
+//   }
 
-unsigned RA_Output::ComputeCost() const{
-  return ComputeExperienceNeeded() + ComputeGameDistribution() +
-         ComputeMinDistanceCost() +
-         ComputeAssignmentFrequency() + ComputeRefereeCompatibility() +
-         ComputeTeamCompatibilityCost();
-}
+//   // Add referee code to the vector of referees for this game
+//   gameAssignments[game_id].push_back(referee_code);
+// }
 
-void RA_Output::Reset(){
-  for(auto& g : gameAssignments){
-    g.clear();
-  }
-}
+// const vector<string>& RA_Output::AssignedReferees(unsigned game_id) const{
+//   return gameAssignments[game_id];
+// }
 
-void RA_Output::Dump(ostream& os) const {
-  for (unsigned g = 0; g < in.Games(); ++g) {
-    const auto& game = in.gamesData[g];
-    os << game.homeTeam_code << " " << game.guestTeam_code << " " << gameAssignments[g].size();
-    for (const auto& r : gameAssignments[g])
-      os << " " << r;
-    os << "\n";
-  }
-}
+// unsigned RA_Output::ComputeCost() const{
+//   return 1;
+//   // ComputeExperienceNeeded() + ComputeGameDistribution() +
+//   //        ComputeMinDistanceCost() +
+//   //        ComputeAssignmentFrequency() + ComputeRefereeCompatibility() +
+//   //        ComputeTeamCompatibilityCost();
+// }
 
-ostream& operator<<(ostream& os, const RA_Output& out){
-  out.Dump(os);
-  return os;
-}
+// void RA_Output::Reset(){
+//   for(auto& g : gameAssignments){
+//     g.clear();
+//   }
+// }
 
-istream& operator>>(istream& is, RA_Output& out) {
-  out.Reset();
-  string home, guest, referee;
-  unsigned num_refs;
-  while (is >> home >> guest >> num_refs) {
-    unsigned game_id = -1;
-    for (unsigned g = 0; g < out.in.Games(); ++g) {
-      if (out.in.gamesData[g].homeTeam_code == home &&
-          out.in.gamesData[g].guestTeam_code == guest) {
-        game_id = g;
-        break;
-      }
-    }
-    if (game_id == -1) {
-      cerr << "Errore: partita " << home << "-" << guest << " non trovata\n";
-      exit(1);
-    }
+// void RA_Output::Dump(ostream& os) const {
+//   for (unsigned g = 0; g < in.Games(); ++g) {
+//     const auto& game = in.gamesData[g];
+//     os << game.homeTeam_code << " " << game.guestTeam_code << " " << gameAssignments[g].size();
+//     for (const auto& r : gameAssignments[g])
+//       os << " " << r;
+//     os << "\n";
+//   }
+// }
 
-    for (unsigned i = 0; i < num_refs; ++i) {
-      is >> referee;
-      out.AssignRefereetoGame(game_id, referee);
-    }
-  }
-  return is;
-}
+// ostream& operator<<(ostream& os, const RA_Output& out){
+//   out.Dump(os);
+//   return os;
+// }
 
-bool operator==(const RA_Output& out1, const RA_Output& out2){
-  if (out1.in.Games() != out2.in.Games()) return false;
-  for (unsigned g = 0; g < out1.in.Games(); ++g) {
-    if (out1.gameAssignments[g] != out2.gameAssignments[g]) return false;
-  }
-  return true;
-}
+// istream& operator>>(istream& is, RA_Output& out) {
+//   out.Reset();
+//   string home, guest, referee;
+//   unsigned num_refs;
+//   while (is >> home >> guest >> num_refs) {
+//     unsigned game_id = -1;
+//     for (unsigned g = 0; g < out.in.Games(); ++g) {
+//       if (out.in.gamesData[g].homeTeam_code == home &&
+//           out.in.gamesData[g].guestTeam_code == guest) {
+//         game_id = g;
+//         break;
+//       }
+//     }
+//     //if (game_id == -1) {
+//       cerr << "Errore: partita " << home << "-" << guest << " non trovata\n";
+//       exit(1);
+//     }
+
+//     for (unsigned i = 0; i < num_refs; ++i) {
+//       is >> referee;
+//       out.AssignRefereeToGame(game_id, referee);
+//     }
+//   }
+//   return is;
+// }
+
+// bool operator==(const RA_Output& out1, const RA_Output& out2){
+//   if (out1.in.Games() != out2.in.Games()) return false;
+//   for (unsigned g = 0; g < out1.in.Games(); ++g) {
+//     if (out1.gameAssignments[g] != out2.gameAssignments[g]) return false;
+//   }
+//   return true;
+// }
