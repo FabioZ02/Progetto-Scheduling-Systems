@@ -274,10 +274,10 @@ bool RA_Output::MinimumReferees() const{
 }
 
 bool RA_Output::FeasibleDistance() const {
-  // Per ogni arbitro, controlla che la distanza tra due partite consecutive assegnate sia fattibile
+  // For each ref, check the game assignment feasibility
   for (const auto& referee : in.refereesData) {
     
-    // Trova tutte le partite assegnate a questo arbitro
+    // Find all aames assigned to a ref
     vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
     for (unsigned g = 0; g < in.Games(); ++g) {
       for (const auto& ref_code : gameAssignments[g]) {
@@ -287,33 +287,33 @@ bool RA_Output::FeasibleDistance() const {
       }
     }
 
-    // Ordina le partite assegnate per data e ora
+    //Sort assigned games by date and time
     sort(assignedGames.begin(), assignedGames.end(), [](const auto& a, const auto& b) {
       time_t ta = mktime(const_cast<tm*>(&a.first));
       time_t tb = mktime(const_cast<tm*>(&b.first));
       if (ta != tb) return ta < tb;
-      // Se la data è uguale, confronta l'orario
+      // If date is the same, compare time
       time_t tma = mktime(const_cast<tm*>(&a.second.first));
       time_t tmb = mktime(const_cast<tm*>(&b.second.first));
       return tma < tmb;
     });
 
-    // Controlla la distanza tra partite consecutive
+    // Check distance between consecutive games
     for (size_t i = 1; i < assignedGames.size(); ++i) {
       unsigned prev_game = assignedGames[i - 1].second.second;
       unsigned curr_game = assignedGames[i].second.second;
       const auto& prev = in.gamesData[prev_game];
       const auto& curr = in.gamesData[curr_game];
 
-      // Calcola il tempo di fine della partita precedente (ipotizziamo durata 2 ore)
+      // COmpute end time of the previous game
       tm end_prev = prev.time;
       end_prev.tm_hour += 2;
       mktime(&end_prev); // normalizza
 
-      // Calcola il tempo di inizio della partita corrente
+      // Copute strart time of next_game
       tm start_curr = curr.time;
 
-      // Calcola la differenza in minuti tra fine della precedente e inizio della successiva
+      // Compute difference in minutes between the end of the previous game and the start of the current game
       tm prev_date = prev.date;
       tm curr_date = curr.date;
       prev_date.tm_hour = end_prev.tm_hour;
@@ -325,7 +325,7 @@ bool RA_Output::FeasibleDistance() const {
 
       double minutes_between = difftime(t_start_curr, t_end_prev) / 60.0;
 
-      // Calcola il tempo di viaggio richiesto
+      // Compute travel time
       const auto& prev_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
                                         [&](const auto& a) { return a.code == prev.arena_code; });
       const auto& curr_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
