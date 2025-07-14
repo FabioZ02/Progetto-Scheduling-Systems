@@ -223,6 +223,7 @@ RA_Input::RA_Input(string file_name) {
 
 }
 
+// Si possono unire le due funzioni implementando un valore per scegliere il secondo parametro
 // Function that computes the distance between two arenas
 float RA_Input::ComputeDistancesBetweenArenas(Arena a1, Arena a2) const{
   // si può usare memoization per evitare di calcolare più volte la stessa distanza (calcolando all'occorrenza i valori richiesti)
@@ -241,13 +242,13 @@ float RA_Input::ComputeDistancesBetweenArenasAndReferees(Arena a, Referee r) con
 // Function that computes the travel time between two arenas
 float RA_Input::ComputeTravelTimeBetweenArenas(Arena a1, Arena a2) const{
   const float speed = 60.0;
-  return (DistanceBetweenArenas(a1, a2) / speed);
+  return (ComputeDistancesBetweenArenas(a1, a2) / speed);
 }
 
 // Function that computes the travel time between an arena and a referee
 float RA_Input::ComputeTravelTimeBetweenArenasAndReferee(Arena a, Referee r) const{
   const float speed = 60.0;
-  return (DistanceBetweenArenasAndReferee(a, r) / speed);
+  return (ComputeDistancesBetweenArenasAndReferees(a, r) / speed);
 }
 
 ostream& operator<<(ostream& os, const RA_Input& in){
@@ -332,7 +333,7 @@ RA_Output& RA_Output::operator=(const RA_Output& out){
 bool RA_Output::MinimumReferees() const{
   for (unsigned g = 0; g < in.Games(); ++g) {
     const auto& game = in.gamesData[g];
-    // DA VEDERE SE IL NUMERO VARIA IN BASE ALLA DIVISIONE
+    // DA VEDERE SE IL NUMERO VARIA IN BASE ALLA DIVISION
     unsigned assigned_referees = gameAssignments[g].size();
 
     // Find the minimum number of referees required for the division of the game
@@ -345,6 +346,7 @@ bool RA_Output::MinimumReferees() const{
     }
 
     if (assigned_referees < min_referees) {
+      cerr << "Game " << g << " requires at least " << min_referees << " referees, but only " << assigned_referees << " are assigned.\n";
       return false;
     }
   }
@@ -358,11 +360,10 @@ bool RA_Output::FeasibleDistance() const {
     // Find all games assigned to a ref
     vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
     for (unsigned g = 0; g < in.Games(); ++g) {
-      for (const auto& ref_code : gameAssignments[g]) {
-        // DA CONTROLLARE COME FARE IL CONFRONTO CON I CODICI (SE HO VETTORE == STRINGA)
-        if (ref_code == referee.code) {
-          assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
-        }
+      if (find(gameAssignments[g].begin(), gameAssignments[g].end(), referee.code) != gameAssignments[g].end()) {
+        assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
+        /* Se le partite sono tante e il codice viene eseguito spesso, puoi pensare a una mappa inversa unordered_map<string, 
+        vector<unsigned>>, dove memorizzi per ogni arbitro la lista di partite assegnate. Ma per ora, find va benissimo.*/
       }
     }
 
@@ -405,13 +406,14 @@ bool RA_Output::FeasibleDistance() const {
       double minutes_between = difftime(t_start_curr, t_end_prev) / 60.0;
 
       // Compute travel time
-      const auto& prev_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                        [&](const auto& a) { return a.code == prev.arena_code; });
-      const auto& curr_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                        [&](const auto& a) { return a.code == curr.arena_code; });
+      const auto& prev_arena = *find_if(in.arenasData.begin(), in.arenasData.end(), [&](const auto& a) { return a.code == prev.arena_code; });
+      const auto& curr_arena = *find_if(in.arenasData.begin(), in.arenasData.end(), [&](const auto& a) { return a.code == curr.arena_code; });
       float travel_time = in.TravelTimeBetweenArenas(prev_arena, curr_arena) * 60.0; // in minuti
 
       if (minutes_between < travel_time) {
+        cerr << "Referee " << referee.code << " cannot travel from game " << prev_game
+             << " to game " << curr_game << " in time. Required travel time: "
+             << travel_time << " minutes, available time: " << minutes_between << " minutes.\n";
         return false;
       }
     }
@@ -423,18 +425,20 @@ bool RA_Output::RefereeAvailability() const {
   // For each ref, check if they are available for the assigned games
   for (const auto& referee : in.refereesData) {
     // Find all games assigned to a ref
+    // IMPLEMENTABILE SEPARATAMENTE
     vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
     for (unsigned g = 0; g < in.Games(); ++g) {
-      for (const auto& ref_code : gameAssignments[g]) {
-        if (referee.code == ref_code) {
-          assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
-        }
+      if (find(gameAssignments[g].begin(), gameAssignments[g].end(), referee.code) != gameAssignments[g].end()) {
+        assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
       }
     }
 
-    for (const auto& ref_code : gameAssignments[0]) {
-      cout << "ref_code = [" << ref_code << "]" << endl;
+    for (const auto& game : assignedGames) {
+      cout << "Checking availability for referee " << referee.code
+           << " on " << put_time(&game.first, "%d/%m/%Y") << " at "
+           << put_time(&game.second.first, "%H:%M") << " for game " << game.second.second << ".\n"; 
     }
+    cout << "Assigned games for referee " << referee.code << ": " << assignedGames.size() << endl << endl;
 
     // Check if the referee is available for each assigned game
     for (const auto& game : assignedGames) {
@@ -442,25 +446,56 @@ bool RA_Output::RefereeAvailability() const {
       const auto& game_time = game.second.first;
       unsigned game_id = game.second.second;
 
+      cout << "Checking availability for game ID " << game_id << " on "
+           << put_time(&game_date, "%d/%m/%Y") << " at "
+           << put_time(&game_time, "%H:%M") << ".\n";
+
+
       // Check if the referee is unavailable on this date and time
       bool available = true;
       for (const auto& unavailability : referee.unavailabilities) {
-        tm unavailable_date = parseDate(unavailability.first);
-        tm unavailable_time = parseTime(unavailability.second);
-
         // Compare dates and times
-        if (unavailable_date.tm_year == game_date.tm_year &&
-            unavailable_date.tm_mon == game_date.tm_mon &&
-            unavailable_date.tm_mday == game_date.tm_mday &&
-            unavailable_time.tm_hour == game_time.tm_hour &&
-            unavailable_time.tm_min == game_time.tm_min) {
-          available = false;
-          break;
+        tm unav_date = parseDate(unavailability.first);
+        tm unav_start = parseTime(unavailability.second);
+        // DA IMPLEMENTARE I TEMPI DI INIZIO E FINE DELLE UNAVAILABILITIES
+
+        cout << "Checking unavailability of " << referee.code << " on: " << put_time(&unavailable_date, "%d/%m/%Y") << " at "
+             << put_time(&unavailable_time, "%H:%M") << ".\n";
+
+        // Solo se la data coincide
+        if (unav_date.tm_year == game_date.tm_year &&
+            unav_date.tm_mon == game_date.tm_mon &&
+            unav_date.tm_mday == game_date.tm_mday) {
+
+          // Supponiamo che ogni indisponibilità duri 3 ore (puoi cambiare questo valore)
+          tm unav_end = unav_start;
+          unav_end.tm_hour += 3;
+          mktime(&unav_end);
+
+          // Costruisci tempi assoluti
+          tm start_unav = game_date;
+          start_unav.tm_hour = unav_start.tm_hour;
+          start_unav.tm_min = unav_start.tm_min;
+          tm end_unav = game_date;
+          end_unav.tm_hour = unav_end.tm_hour;
+          end_unav.tm_min = unav_end.tm_min;
+
+          time_t t_unav_start = mktime(&start_unav);
+          time_t t_unav_end = mktime(&end_unav);
+
+          // Verifica sovrapposizione
+          if (!(t_unav_end <= t_start || t_unav_start >= t_end)) {
+            return false; // L’arbitro non è disponibile
+          }
         }
       }
 
+
       if (!available) {
-        return false; // Referee is not available for this game
+        cerr << "Referee " << referee.code << " is not available for game ID " << game_id
+             << " on " << put_time(&game_date, "%d/%m/%Y") << " at "
+             << put_time(&game_time, "%H:%M") << ".\n";
+        return false;
       }
     }
   }
@@ -479,10 +514,12 @@ void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code
   }
 
   // Add referee code to the vector of referees for this game
+  cout << "Assigning referee '" << referee_code << "' to game ID " << game_id << ".\n";
   gameAssignments[game_id].push_back(referee_code);
 }
 
-const vector<string>& RA_Output::AssignedReferees(unsigned game_id) const{
+const vector<string>& RA_Output::AssignedRefereesToGame(unsigned game_id) const{
+  cout << "Retrieving assigned referees for game ID " << game_id << ".\n";
   return gameAssignments[game_id];
 }
 
