@@ -240,6 +240,7 @@ ostream& operator<<(ostream& os, const RA_Input& in){
 
 /////////////////////////////////// RA_Output Implementation //////////////////////////////////////
 
+// Builder
 RA_Output::RA_Output(const RA_Input& my_in): in(my_in){
   gameAssignments.resize(in.Games());
 } 
@@ -249,12 +250,11 @@ RA_Output& RA_Output::operator=(const RA_Output& out){
   return *this;
 }
 
-
-
 // The number of mandatory referees must always be assigned to each game.
 bool RA_Output::MinimumReferees() const{
   for (unsigned g = 0; g < in.Games(); ++g) {
     const auto& game = in.gamesData[g];
+    // DA VEDERE SE IL NUMERO VARIA IN BASE ALLA DIVISIONE
     unsigned assigned_referees = gameAssignments[g].size();
 
     // Find the minimum number of referees required for the division of the game
@@ -277,10 +277,11 @@ bool RA_Output::FeasibleDistance() const {
   // For each ref, check the game assignment feasibility
   for (const auto& referee : in.refereesData) {
     
-    // Find all aames assigned to a ref
+    // Find all games assigned to a ref
     vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
     for (unsigned g = 0; g < in.Games(); ++g) {
       for (const auto& ref_code : gameAssignments[g]) {
+        // DA CONTROLLARE COME FARE IL CONFRONTO CON I CODICI (SE HO VETTORE == STRINGA)
         if (ref_code == referee.code) {
           assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
         }
@@ -288,7 +289,7 @@ bool RA_Output::FeasibleDistance() const {
     }
 
     //Sort assigned games by date and time
-    sort(assignedGames.begin(), assignedGames.end(), [](const auto& a, const auto& b) {
+    sort(assignedGames.begin(), assignedGames.end(), [](const auto& a, const auto& b)) {
       time_t ta = mktime(const_cast<tm*>(&a.first));
       time_t tb = mktime(const_cast<tm*>(&b.first));
       if (ta != tb) return ta < tb;
@@ -296,7 +297,7 @@ bool RA_Output::FeasibleDistance() const {
       time_t tma = mktime(const_cast<tm*>(&a.second.first));
       time_t tmb = mktime(const_cast<tm*>(&b.second.first));
       return tma < tmb;
-    });
+    };
 
     // Check distance between consecutive games
     for (size_t i = 1; i < assignedGames.size(); ++i) {
@@ -305,12 +306,12 @@ bool RA_Output::FeasibleDistance() const {
       const auto& prev = in.gamesData[prev_game];
       const auto& curr = in.gamesData[curr_game];
 
-      // COmpute end time of the previous game
+      // Compute end time of the previous game
       tm end_prev = prev.time;
       end_prev.tm_hour += 2;
       mktime(&end_prev); // normalizza
 
-      // Copute strart time of next_game
+      // Compute strart time of next_game
       tm start_curr = curr.time;
 
       // Compute difference in minutes between the end of the previous game and the start of the current game
@@ -341,7 +342,47 @@ bool RA_Output::FeasibleDistance() const {
 }
 
 bool RA_Output::RefereeAvailability() const {
+  // For each ref, check if they are available for the assigned games
+  for (const auto& referee : in.refereesData) {
+    // Find all games assigned to a ref
+    vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
+    for (unsigned g = 0; g < in.Games(); ++g) {
+      for (const auto& ref_code : gameAssignments[g]) {
+        if (ref_code == referee.code) {
+          assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
+        }
+      }
+    }
 
+    // Check if the referee is available for each assigned game
+    for (const auto& game : assignedGames) {
+      const auto& game_date = game.first;
+      const auto& game_time = game.second.first;
+      unsigned game_id = game.second.second;
+
+      // Check if the referee is unavailable on this date and time
+      bool available = true;
+      for (const auto& unavailability : referee.unavailabilities) {
+        tm unavailable_date = parseDate(unavailability.first);
+        tm unavailable_time = parseTime(unavailability.second);
+
+        // Compare dates and times
+        if (unavailable_date.tm_year == game_date.tm_year &&
+            unavailable_date.tm_mon == game_date.tm_mon &&
+            unavailable_date.tm_mday == game_date.tm_mday &&
+            unavailable_time.tm_hour == game_time.tm_hour &&
+            unavailable_time.tm_min == game_time.tm_min) {
+          available = false;
+          break;
+        }
+      }
+
+      if (!available) {
+        return false; // Referee is not available for this game
+      }
+    }
+  }
+  return true;
 }
 
 bool RA_Output::Feasibility() const{
