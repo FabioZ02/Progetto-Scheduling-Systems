@@ -40,7 +40,7 @@ class RA_Input{
       unsigned experience;                                // INT Experience of the referee
       vector<string> incompatible_referees;             // Vector of referees that this referee cannot work with
       vector<string> incompatible_teams;                // Vector of teams that this referee cannot officiate
-      vector<pair <string, string>> unavailabilities; // Vector of pairs representing unavailability periods (date, hour)
+      vector<pair <tm, pair<tm, tm>>> unavailabilities; // Vector of pairs representing unavailability periods (date, hour)
     };
     vector<Referee> refereesData;   
     
@@ -114,6 +114,7 @@ class RA_Output{
   private:
     const RA_Input& in;
     vector<vector<string>> gameAssignments;
+    vector<pair<tm, pair<tm, unsigned>>> GamesAssignedToReferee(const string& referee_code) const; // (date, (time, game_id))
 
     // non credo servano
     // float DistanceBetweenArenas(RA_Input::Arena a1, RA_Input::Arena a2) const { return in.DistanceBetweenArenas(a1, a2); }

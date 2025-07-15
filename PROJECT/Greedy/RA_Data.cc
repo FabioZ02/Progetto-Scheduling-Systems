@@ -156,12 +156,22 @@ RA_Input::RA_Input(string file_name) {
             stringstream unavail_ss(token);
             string date_time;
             while (getline(unavail_ss, date_time, ',')) {
+                date_time = Trim(date_time); // Clean up whitespace
+
                 if (!date_time.empty()) {
                     size_t space_pos = date_time.find(' ');
-                    if (space_pos != string::npos) {
-                        string date = date_time.substr(0, space_pos);
-                        string time = date_time.substr(space_pos + 1);
-                        refereesData[r].unavailabilities.emplace_back(date, time);
+                    size_t dash_pos = date_time.find('-');
+
+                    if (space_pos != string::npos && dash_pos != string::npos) {
+                        string date_str = date_time.substr(0, space_pos);
+                        string time_start_str = date_time.substr(space_pos + 1, dash_pos - space_pos - 1);
+                        string time_end_str = date_time.substr(dash_pos + 1);
+
+                        tm date = parseDate(date_str);
+                        tm time_start = parseTime(time_start_str);
+                        tm time_end = parseTime(time_end_str);
+
+                        refereesData[r].unavailabilities.emplace_back(make_pair(date, make_pair(time_start, time_end)));
                     }
                 }
             }
@@ -282,8 +292,14 @@ ostream& operator<<(ostream& os, const RA_Input& in){
       if (i < r.incompatible_teams.size() - 1) os << ", ";
     }
     os << "], [";
+    char date_buf[11];
+    char timeStart_buf[6];
+    char timeEnd_buf[6];
     for (size_t i = 0; i < r.unavailabilities.size(); ++i) {
-      os << r.unavailabilities[i].first << " " << r.unavailabilities[i].second;
+      strftime(date_buf, sizeof(date_buf), "%d/%m/%Y", &r.unavailabilities[i].first);
+      strftime(timeStart_buf, sizeof(timeStart_buf), "%H:%M", &r.unavailabilities[i].second.first);
+      strftime(timeEnd_buf, sizeof(timeEnd_buf), "%H:%M", &r.unavailabilities[i].second.second);
+      os << date_buf << " " << timeStart_buf << "-" << timeEnd_buf;
       if (i < r.unavailabilities.size() - 1) os << ", ";
     }
     os << "]\n";
@@ -318,6 +334,21 @@ ostream& operator<<(ostream& os, const RA_Input& in){
 }
 
 /////////////////////////////////// RA_Output Implementation //////////////////////////////////////
+
+// Function that returns all the games assigned to a referee
+/* Se le partite sono tante e il codice viene eseguito spesso, puoi pensare a una mappa inversa unordered_map<string, 
+vector<unsigned>>, dove memorizzi per ogni arbitro la lista di partite assegnate. Ma per ora, find va benissimo.*/
+vector<pair<tm, pair<tm, unsigned>>> RA_Output::GamesAssignedToReferee(const string& referee_code) const {
+  vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
+  
+  for (unsigned g = 0; g < in.Games(); ++g) {
+      if (find(gameAssignments[g].begin(), gameAssignments[g].end(), referee_code) != gameAssignments[g].end()) {
+          assignedGames.push_back(make_pair(in.gamesData[g].date, make_pair(in.gamesData[g].time, g)));
+      }
+  }
+  
+  return assignedGames;
+}
 
 // Builder
 RA_Output::RA_Output(const RA_Input& my_in): in(my_in){
@@ -357,25 +388,16 @@ bool RA_Output::FeasibleDistance() const {
   // For each ref, check the game assignment feasibility
   for (const auto& referee : in.refereesData) {
     
-    // Find all games assigned to a ref
-    vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
-    for (unsigned g = 0; g < in.Games(); ++g) {
-      if (find(gameAssignments[g].begin(), gameAssignments[g].end(), referee.code) != gameAssignments[g].end()) {
-        assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
-        /* Se le partite sono tante e il codice viene eseguito spesso, puoi pensare a una mappa inversa unordered_map<string, 
-        vector<unsigned>>, dove memorizzi per ogni arbitro la lista di partite assegnate. Ma per ora, find va benissimo.*/
-      }
-    }
+    // Find all games assigned to a ref (date, (time, game_id)))
+    vector<pair<tm, pair<tm, unsigned>>> assignedGames = GamesAssignedToReferee(referee.code); // (date, (time, game_id))
 
     //Sort assigned games by date and time
     sort(assignedGames.begin(), assignedGames.end(), [](const auto& a, const auto& b) {
-      time_t ta = mktime(const_cast<tm*>(&a.first));
-      time_t tb = mktime(const_cast<tm*>(&b.first));
-      if (ta != tb) return ta < tb;
-      // If date is the same, compare time
-      time_t tma = mktime(const_cast<tm*>(&a.second.first));
-      time_t tmb = mktime(const_cast<tm*>(&b.second.first));
-      return tma < tmb;
+      if (a.first.tm_year != b.first.tm_year) return a.first.tm_year < b.first.tm_year;
+      if (a.first.tm_mon != b.first.tm_mon) return a.first.tm_mon < b.first.tm_mon;
+      if (a.first.tm_mday != b.first.tm_mday) return a.first.tm_mday < b.first.tm_mday;
+      if (a.second.first.tm_hour != b.second.first.tm_hour) return a.second.first.tm_hour < b.second.first.tm_hour;
+      return a.second.first.tm_min < b.second.first.tm_min;
     });
 
     // Check distance between consecutive games
@@ -425,71 +447,33 @@ bool RA_Output::RefereeAvailability() const {
   // For each ref, check if they are available for the assigned games
   for (const auto& referee : in.refereesData) {
     // Find all games assigned to a ref
-    // IMPLEMENTABILE SEPARATAMENTE
-    vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
-    for (unsigned g = 0; g < in.Games(); ++g) {
-      if (find(gameAssignments[g].begin(), gameAssignments[g].end(), referee.code) != gameAssignments[g].end()) {
-        assignedGames.push_back({in.gamesData[g].date, {in.gamesData[g].time, g}});
-      }
-    }
-
-    for (const auto& game : assignedGames) {
-      cout << "Checking availability for referee " << referee.code
-           << " on " << put_time(&game.first, "%d/%m/%Y") << " at "
-           << put_time(&game.second.first, "%H:%M") << " for game " << game.second.second << ".\n"; 
-    }
-    cout << "Assigned games for referee " << referee.code << ": " << assignedGames.size() << endl << endl;
+    vector<pair<tm, pair<tm, unsigned>>> assignedGames = GamesAssignedToReferee(referee.code); // (date, (time, game_id))
 
     // Check if the referee is available for each assigned game
     for (const auto& game : assignedGames) {
-      const auto& game_date = game.first;
-      const auto& game_time = game.second.first;
+      auto& game_date = game.first;
+      auto& game_time = game.second.first;
       unsigned game_id = game.second.second;
 
-      cout << "Checking availability for game ID " << game_id << " on "
-           << put_time(&game_date, "%d/%m/%Y") << " at "
-           << put_time(&game_time, "%H:%M") << ".\n";
-
-
       // Check if the referee is unavailable on this date and time
-      bool available = true;
+      bool available = true; // Assume not available unless we find a match
       for (const auto& unavailability : referee.unavailabilities) {
         // Compare dates and times
-        tm unav_date = parseDate(unavailability.first);
-        tm unav_start = parseTime(unavailability.second);
-        // DA IMPLEMENTARE I TEMPI DI INIZIO E FINE DELLE UNAVAILABILITIES
-
-        cout << "Checking unavailability of " << referee.code << " on: " << put_time(&unavailable_date, "%d/%m/%Y") << " at "
-             << put_time(&unavailable_time, "%H:%M") << ".\n";
-
-        // Solo se la data coincide
-        if (unav_date.tm_year == game_date.tm_year &&
-            unav_date.tm_mon == game_date.tm_mon &&
-            unav_date.tm_mday == game_date.tm_mday) {
-
-          // Supponiamo che ogni indisponibilità duri 3 ore (puoi cambiare questo valore)
-          tm unav_end = unav_start;
-          unav_end.tm_hour += 3;
-          mktime(&unav_end);
-
-          // Costruisci tempi assoluti
-          tm start_unav = game_date;
-          start_unav.tm_hour = unav_start.tm_hour;
-          start_unav.tm_min = unav_start.tm_min;
-          tm end_unav = game_date;
-          end_unav.tm_hour = unav_end.tm_hour;
-          end_unav.tm_min = unav_end.tm_min;
-
-          time_t t_unav_start = mktime(&start_unav);
-          time_t t_unav_end = mktime(&end_unav);
-
-          // Verifica sovrapposizione
-          if (!(t_unav_end <= t_start || t_unav_start >= t_end)) {
-            return false; // L’arbitro non è disponibile
-          }
+        tm unav_date = unavailability.first;
+        tm unav_start = unavailability.second.first;
+        tm unav_end = unavailability.second.second;
+        
+        // Only if the unavailability date matches the game date
+        if (unav_date.tm_year == game_date.tm_year && unav_date.tm_mon == game_date.tm_mon && unav_date.tm_mday == game_date.tm_mday) {
+            
+          // Check the availability time, first the end of the game before the start of the unavailability
+          // and next the start of the game after the end of the unavailability
+          if ( !(((difftime(unav_start.tm_hour, game_time.tm_hour+2) > 0) || (difftime(unav_start.tm_min, game_time.tm_min) > 0)) ||
+               ((difftime(game_time.tm_hour, unav_end.tm_hour) > 0 || difftime(game_time.tm_min, unav_end.tm_min) > 0))) ){
+              return false; // The referee is available during the game time
+            }
         }
       }
-
 
       if (!available) {
         cerr << "Referee " << referee.code << " is not available for game ID " << game_id
@@ -506,10 +490,17 @@ bool RA_Output::Feasibility() const{
   return MinimumReferees() && FeasibleDistance() && RefereeAvailability();
 }
 
+// Function to assign a referee to a game
 void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code) {
   // Check if game_id is within bounds
   if (game_id >= gameAssignments.size()) {
-    cerr << "Error: game_id out of bounds" << endl;
+    cerr << "Error: game_id " << game_id << " out of bounds" << endl;
+    return;
+  }
+
+  // Check if the referee_code is already assigned to this game
+  if (find(gameAssignments[game_id].begin(), gameAssignments[game_id].end(), referee_code) != gameAssignments[game_id].end()) {
+    cerr << "Error: Referee '" << referee_code << "' is already assigned to game ID " << game_id << ".\n";
     return;
   }
 
@@ -557,7 +548,7 @@ istream& operator>>(istream& is, RA_Output& out) {
   string home, guest, referee;
   unsigned num_refs;
   while (is >> home >> guest >> num_refs) {
-    unsigned game_id = -1;
+    int game_id = -1;
     for (unsigned g = 0; g < out.in.Games(); ++g) {
       if (out.in.gamesData[g].homeTeam_code == home &&
           out.in.gamesData[g].guestTeam_code == guest) {
