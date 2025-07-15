@@ -68,7 +68,7 @@ RA_Input::RA_Input(string file_name) {
     string line;
     stringstream ss(line);
 
-    // === Leggi DIVISIONS ===
+    // Reading DIVISIONS
     while (getline(is, line)) {
         if (line.find("DIVISIONS") != string::npos) break;
     }
@@ -87,7 +87,7 @@ RA_Input::RA_Input(string file_name) {
             >> divisionsData[d].teams;
     };
 
-    // === Leggi REFEREES ===
+    // Reading REFEREES
     while (getline(is, line)) {
         if (!line.empty() && line[0] == 'R' && line.find('%') != string::npos) break;
     }
@@ -168,7 +168,7 @@ RA_Input::RA_Input(string file_name) {
         }
     }
 
-    // === Leggi ARENAS ===
+    // Reading ARENAS
     while (getline(is, line)) {
         if (line.find("ARENAS") != string::npos) break;
     }
@@ -188,7 +188,7 @@ RA_Input::RA_Input(string file_name) {
         coord_ss >> arenasData[a].coordinates.second;
     }
 
-    // === Leggi TEAMS ===
+    // Reading TEAMS
     while (getline(is, line)) {
         if (line.find("TEAMS") != string::npos) break;
     }
@@ -199,7 +199,7 @@ RA_Input::RA_Input(string file_name) {
         ss >> teamsData[t].code >> teamsData[t].division_code;
     }
 
-    // === Leggi GAMES ===
+    // Reading GAMES
     while (getline(is, line)) {
         if (line.find("GAMES") != string::npos) break;
     }

@@ -1,29 +1,16 @@
-# Nome dell'eseguibile finale
-TARGET = ra
+OPTIONS = -Wall -Wfatalerrors -O3
 
-# Compilatore
-CXX = g++
+RA_Test.exe: RA_Driver.o Ra_Data.o RA_Greedy.of
+        g++ -o RA_Test.exe RA_Driver.o RA_Data.o RA_Greedy.o RA_Greedy.o
 
-# Opzioni di compilazione
-CXXFLAGS = -Wall -Wextra -std=c++17 -O3
+RA_Data.o: RA_Data.cc RA_Data.hh
+        g++ $(OPTIONS) -c RA_Data.cc
 
-# File sorgenti
-SRCS = RA_Main.cc RA_Data.cc
+RA_Greedy.o: RA_Greedy.cc RA_Greedy.hh RA_Data.hh
+        g++ $(OPTIONS) -c RA_Greedy.cc 
 
-# File oggetto
-OBJS = $(SRCS:.cc=.o)
+RA_Driver.o: RA_Driver.cc RA_Data.hh
+        g++ $(OPTIONS) -c RA_Driver.cc
 
-# Regola principale
-all: $(TARGET)
-
-# Linking
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-# Compilazione dei .cc in .o
-%.o: %.cc
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# Pulizia
 clean:
-	rm -f $(OBJS) $(TARGET)
+        rm -f RA_Data.o RA_Greedy.o RA_Driver.o RA_Test.exe
