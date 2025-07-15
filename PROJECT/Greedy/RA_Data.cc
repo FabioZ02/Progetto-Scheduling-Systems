@@ -9,7 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
-
+#include <numeric>
 
 using namespace std;
 
@@ -350,9 +350,47 @@ vector<pair<tm, pair<tm, unsigned>>> RA_Output::GamesAssignedToReferee(const str
   return assignedGames;
 }
 
+// Function to assign a referee to a game
+void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code) {
+  // Check if game_id is within bounds
+  if (game_id >= gameAssignments.size()) {
+    cerr << "Error: game_id " << game_id << " out of bounds" << endl;
+    return;
+  }
+
+  // Check if the referee_code is already assigned to this game
+  if (find(gameAssignments[game_id].begin(), gameAssignments[game_id].end(), referee_code) != gameAssignments[game_id].end()) {
+    cerr << "Error: Referee '" << referee_code << "' is already assigned to game ID " << game_id << ".\n";
+    return;
+  }
+
+  // Add referee code to the vector of referees for this game
+  cout << "Assigning referee '" << referee_code << "' to game ID " << game_id << ".\n";
+  gameAssignments[game_id].push_back(referee_code);
+
+  // Update the gameAssignmentsPerReferee vector
+  unsigned referee_index = find_if(in.refereesData.begin(), in.refereesData.end(),
+                                    [&](const RA_Input::Referee& r) { return r.code == referee_code; }) - in.refereesData.begin();
+  unsigned team_index_H = find_if(in.teamsData.begin(), in.teamsData.end(),
+                                    [&](const RA_Input::Team& t) { return t.code == in.gamesData[game_id].homeTeam_code; }) - in.teamsData.begin();
+  unsigned team_index_G = find_if(in.teamsData.begin(), in.teamsData.end(),
+                                    [&](const RA_Input::Team& t) { return t.code == in.gamesData[game_id].guestTeam_code; }) - in.teamsData.begin();
+  
+  teamAssignmentsPerReferee[referee_index][team_index_H]++;
+  teamAssignmentsPerReferee[referee_index][team_index_G]++;
+}
+
+// Function to retrieve the referees assigned to a specific game DA CANCELLARE O USARE
+const vector<string>& RA_Output::AssignedRefereesToGame(unsigned game_id) const{
+  cout << "Retrieving assigned referees for game ID " << game_id << ".\n";
+  return gameAssignments[game_id];
+}
+
+
 // Builder
 RA_Output::RA_Output(const RA_Input& my_in): in(my_in){
-  gameAssignments.resize(in.Games());
+    gameAssignments.resize(in.Games());
+    teamAssignmentsPerReferee.resize(in.Referees(), vector<unsigned>(in.Teams(), 0)); // Initialize with 0 assignments for each referee per team
 } 
 
 RA_Output& RA_Output::operator=(const RA_Output& out){
@@ -360,24 +398,31 @@ RA_Output& RA_Output::operator=(const RA_Output& out){
   return *this;
 }
 
+
 // The number of mandatory referees must always be assigned to each game.
-bool RA_Output::MinimumReferees() const{
+bool RA_Output::NumberOfReferees() const{
   for (unsigned g = 0; g < in.Games(); ++g) {
     const auto& game = in.gamesData[g];
-    // DA VEDERE SE IL NUMERO VARIA IN BASE ALLA DIVISION
+
     unsigned assigned_referees = gameAssignments[g].size();
 
     // Find the minimum number of referees required for the division of the game
     unsigned min_referees = 1; // default value
+    unsigned max_referees = 1; // default value
     for (const auto& div : in.divisionsData) {
       if (div.code == game.division_code) {
         min_referees = div.min_referees;
+        max_referees = div.max_referees;
         break;
       }
     }
 
     if (assigned_referees < min_referees) {
       cerr << "Game " << g << " requires at least " << min_referees << " referees, but only " << assigned_referees << " are assigned.\n";
+      return false;
+    }
+    if (assigned_referees > max_referees) {
+      cerr << "Game " << g << " requires at most " << max_referees << " referees, but " << assigned_referees << " are assigned.\n";
       return false;
     }
   }
@@ -487,39 +532,173 @@ bool RA_Output::RefereeAvailability() const {
 }
 
 bool RA_Output::Feasibility() const{
-  return MinimumReferees() && FeasibleDistance() && RefereeAvailability();
+  return NumberOfReferees() && FeasibleDistance() && RefereeAvailability();
 }
 
-// Function to assign a referee to a game
-void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code) {
-  // Check if game_id is within bounds
-  if (game_id >= gameAssignments.size()) {
-    cerr << "Error: game_id " << game_id << " out of bounds" << endl;
-    return;
-  }
 
-  // Check if the referee_code is already assigned to this game
-  if (find(gameAssignments[game_id].begin(), gameAssignments[game_id].end(), referee_code) != gameAssignments[game_id].end()) {
-    cerr << "Error: Referee '" << referee_code << "' is already assigned to game ID " << game_id << ".\n";
-    return;
-  }
+// Check if the referee level is at leat the minimum required for the game in that division
+unsigned RA_Output::RefereeLevel() const {
+    unsigned violations = 0;
+    for (unsigned g = 0; g < in.Games(); ++g) {
+        const auto& game = in.gamesData[g];
+        unsigned required_level = 0;
 
-  // Add referee code to the vector of referees for this game
-  cout << "Assigning referee '" << referee_code << "' to game ID " << game_id << ".\n";
-  gameAssignments[game_id].push_back(referee_code);
+        // Find the division of the game
+        for (const auto& div : in.divisionsData) {
+            if (div.code == game.division_code) {
+                required_level = div.level;
+                break;
+            }
+        }
+
+        // Check if all assigned referees meet the required level
+        for (const auto& referee_code : gameAssignments[g]) {
+            for (const auto& referee : in.refereesData) {
+                if (referee.code == referee_code) {
+                    if (referee.level < required_level) {
+                        violations++;
+                    }
+                }
+            }
+        }
+    }
+    return violations;
+}
+// Sum of the exxperience of all referees assigned to the games
+unsigned RA_Output::ExperienceNeeded() const {
+    unsigned violations = 0;
+    for (unsigned g = 0; g < in.Games(); ++g) {
+        const auto& game = in.gamesData[g];
+        unsigned total_experience = 0;
+
+        // Check if the sum of the experience of all referees assigned to the game is at 
+        // least the required experience
+        for (const auto& referee_code : gameAssignments[g]) {
+            for (const auto& referee : in.refereesData) {
+                if (referee.code == referee_code) {
+                    total_experience += referee.experience;
+                }
+            }
+        }
+
+        // If the total experience is less than the required experience, count a violation
+        if( total_experience < game.experience_required) {
+            violations++;
+        }
+    }
+    return violations;
+}
+// Check the distribution of games among referees
+unsigned RA_Output::GameDistribution() const {
+    unsigned violations = 0;
+
+    // Count the number of games assigned to each referee
+    vector<unsigned> games_per_referee(in.Referees(), 0);
+    for (unsigned r = 0; r < in.Referees(); ++r) {
+        for (unsigned g = 0; g < in.Games(); ++g) {
+            if (find(gameAssignments[g].begin(), gameAssignments[g].end(), in.refereesData[r].code) != gameAssignments[g].end()) {
+                games_per_referee[r]++;
+            }
+        }
+    }
+
+    for (unsigned r = 0; r < in.Referees(); ++r) {
+        games_per_referee[r] = games_per_referee[r] / in.Games();
+    }
+
+    // Calculate the mean and standard deviation of games assigned to referees
+    float mean_value = accumulate(games_per_referee.begin(), games_per_referee.end(), 0) / in.Referees();
+    
+    float std_dev = 0.0;
+    for (unsigned r = 0; r < in.Referees(); ++r) {
+        std_dev += pow(games_per_referee[r] - mean_value, 2);
+    }
+    std_dev = sqrt(std_dev / in.Referees());
+
+    // Count the number of referees whose assigned games deviate from the mean by more than one standard deviation
+    for (unsigned r = 0; r < in.Referees(); ++r) {
+        if (abs(games_per_referee[r] - mean_value) > std_dev) {
+            violations++;
+        }
+    }
+
+    return violations;
+}
+// Check the total distance traveled by all referees
+unsigned RA_Output::TotalDistance() const {
+    // Placeholder for the actual implementation
+    return 0;
+}
+// Check if the number of referees is at least the minimum + 1
+unsigned RA_Output::OptionalRefereee() const {
+    unsigned violations = 0;
+    for (unsigned g = 0; g < in.Games(); ++g) {
+        const auto& game = in.gamesData[g];
+        unsigned assigned_referees = gameAssignments[g].size();
+        // Find the minimum number of referees allowed for the division of the game
+        unsigned min_referees = 1; // default value
+        for (const auto& div : in.divisionsData) {
+            if (div.code == game.division_code) {
+                min_referees = div.min_referees;
+                break;
+            }
+        }
+        // Check if the number of assigned referees is equal to the minimum required
+        // so there are no optional referees
+        if(assigned_referees == min_referees) {
+            violations++;
+        }
+    }
+    return violations;
+}
+// Check if a referee is assigned to the same team more often than a certain threshold
+unsigned RA_Output::AssignmentFrequency() const {
+    unsigned violations = 0;
+    unsigned number_of_games_per_team = in.Teams() * (in.Teams() - 1) / 2; // Assuming each team plays with every other team once
+    unsigned team_assignments;
+    float mean_team = 0, std_dev_team = 0;
+
+    for (unsigned t = 0; t < in.Teams(); ++t) {
+        for (unsigned r = 0; r < in.Referees(); ++r) {
+            mean_team += team_assignments;
+        }
+        mean_team = mean_team / in.Referees();
+        
+
+        for (unsigned r = 0; r < in.Referees(); ++r) {
+            team_assignments = teamAssignmentsPerReferee[r][t];
+            std_dev_team += pow(team_assignments - mean_team, 2);
+
+            if ( abs(team_assignments - mean_team) > std_dev_team ) {
+                violations++;
+                cerr << "Referee " << in.refereesData[r].code << " is assigned to team " 
+                    << in.teamsData[t].code << " more than the mean frequency.\n";
+            }
+        }
+    }
+    return violations;
+}
+unsigned RA_Output::RefereeIncompatibility() const {
+    // Placeholder for the actual implementation
+    return 0;
+}
+unsigned RA_Output::TeamIncompatibility() const {
+    // Placeholder for the actual implementation
+    return 0;
 }
 
-const vector<string>& RA_Output::AssignedRefereesToGame(unsigned game_id) const{
-  cout << "Retrieving assigned referees for game ID " << game_id << ".\n";
-  return gameAssignments[game_id];
+unsigned RA_Output::ComputeViolations() const {
+  return RefereeLevel() + ExperienceNeeded() +
+         GameDistribution() + TotalDistance() +
+         OptionalRefereee() + AssignmentFrequency() +
+         RefereeIncompatibility() + TeamIncompatibility();
 }
 
 unsigned RA_Output::ComputeCost() const{
-  return 1;
-  // ComputeExperienceNeeded() + ComputeGameDistribution() +
-  //        ComputeMinDistanceCost() +
-  //        ComputeAssignmentFrequency() + ComputeRefereeCompatibility() +
-  //        ComputeTeamCompatibilityCost();
+  return 70 * RefereeLevel() + 50 * ExperienceNeeded() +
+         20 * GameDistribution() + 100 * TotalDistance() +
+         10 * OptionalRefereee() + 50 * AssignmentFrequency() +
+         35 * RefereeIncompatibility() + 45 * TeamIncompatibility();
 }
 
 void RA_Output::Reset(){

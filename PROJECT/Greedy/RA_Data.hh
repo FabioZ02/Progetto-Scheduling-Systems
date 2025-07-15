@@ -98,7 +98,7 @@ class RA_Output{
     RA_Output& operator=(const RA_Output& out);
     
     // Hard constraints
-    bool MinimumReferees() const;
+    bool NumberOfReferees() const;
     bool FeasibleDistance() const;
     bool RefereeAvailability() const;
     bool Feasibility() const;
@@ -106,6 +106,7 @@ class RA_Output{
     void AssignRefereeToGame(unsigned game_id, const string& referee_code);
     const vector<string>& AssignedRefereesToGame(unsigned game_id) const;
 
+    unsigned ComputeViolations() const;
     unsigned ComputeCost() const;
 
     void Reset();
@@ -113,22 +114,19 @@ class RA_Output{
 
   private:
     const RA_Input& in;
-    vector<vector<string>> gameAssignments;
+    vector<vector<string>> gameAssignments; // Vector of vectors to store assigned referees for each game
     vector<pair<tm, pair<tm, unsigned>>> GamesAssignedToReferee(const string& referee_code) const; // (date, (time, game_id))
-
-    // non credo servano
-    // float DistanceBetweenArenas(RA_Input::Arena a1, RA_Input::Arena a2) const { return in.DistanceBetweenArenas(a1, a2); }
-    // float DistanceBetweenArenasAndReferee(RA_Input::Arena a, RA_Input::Referee r) const { return in.DistanceBetweenArenasAndReferee(a, r); }
-    // float TravelTimeBetweenArenas(RA_Input::Arena a1, RA_Input::Arena a2) const { return in.TravelTimeBetweenArenas(a1, a2); }
-    // float TravelTimeBetweenArenasAndReferee(RA_Input::Arena a, RA_Input::Referee r) const { return in.TravelTimeBetweenArenasAndReferee(a, r); }
-
+    vector<vector<unsigned>> teamAssignmentsPerReferee; // Vector of vectors to store the number of times a referee 
+                                                         // has been assigned to a specific team
+    
     // soft constraints (da implementare)
-    // unsigned ComputeExperienceNeeded() const;
-    // unsigned ComputeGameDistribution() const;
-    // unsigned ComputeMinDistanceCost() const;
-    // unsigned CoputeOptionalRefereee() const;
-    // unsigned ComputeAssignmentFrequency() const;
-    // unsigned ComputeRefereeCompatibility() const;
-    // unsigned ComputeTeamCompatibilityCost() const;
+    unsigned RefereeLevel() const;
+    unsigned ExperienceNeeded() const;
+    unsigned GameDistribution() const;
+    unsigned TotalDistance() const;
+    unsigned OptionalRefereee() const;
+    unsigned AssignmentFrequency() const;
+    unsigned RefereeIncompatibility() const;
+    unsigned TeamIncompatibility() const;
 };
 #endif
