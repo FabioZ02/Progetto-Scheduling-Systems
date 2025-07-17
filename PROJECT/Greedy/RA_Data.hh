@@ -76,8 +76,12 @@ class RA_Input{
     float DistanceBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeDistancesBetweenArenasAndReferees(a, r);}
     float TravelTimeBetweenArenas(Arena a1, Arena a2) const {return ComputeTravelTimeBetweenArenas(a1, a2);}
     float TravelTimeBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeTravelTimeBetweenArenasAndReferee(a, r);}
-
     
+    const Arena& GetArenaByCode(const string& code) const;  // Returns the Arena object by its code
+    const Referee& GetRefereeByCode(const string& code) const; // Returns the Referee object by its code
+    bool AreRefereesIncompatible(const string& code1, const string& code2) const; // Checks if two referees are incompatible
+    bool IsRefereeIncompatibleWithTeam(const string& referee_code, const string& team_code) const; // Checks if a referee is incompatible with a team
+
   private:
     unsigned divisions, referees, arenas, teams, games;
 

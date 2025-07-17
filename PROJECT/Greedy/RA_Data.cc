@@ -333,6 +333,45 @@ ostream& operator<<(ostream& os, const RA_Input& in){
   return os;
 }
 
+// Function to find the arena by its code
+const RA_Input::Arena& RA_Input::GetArenaByCode(const string& code) const {
+    auto arena = find_if(arenasData.begin(), arenasData.end(),
+                      [&](const Arena& a) { return a.code == code; });
+
+    if (arena == arenasData.end()) {
+        cerr << "Errore: Arena con codice '" << code << "' non trovata.\n";
+        exit(1);
+    }
+
+    return *arena;
+}
+// Function to find the referee by its code
+const RA_Input::Referee& RA_Input::GetRefereeByCode(const string& code) const {
+    auto it = find_if(refereesData.begin(), refereesData.end(),
+                      [&](const Referee& r) { return r.code == code; });
+
+    if (it == refereesData.end()) {
+        cerr << "Errore: Arbitro con codice '" << code << "' non trovato.\n";
+        exit(1);
+    }
+
+    return *it;
+}
+// Function to check if two teams are incompatible
+bool RA_Input::AreRefereesIncompatible(const string& code1, const string& code2) const {
+    const auto& ref1 = GetRefereeByCode(code1);
+    const auto& ref2 = GetRefereeByCode(code2);
+
+    return (find(ref1.incompatible_referees.begin(), ref1.incompatible_referees.end(), code2) != ref1.incompatible_referees.end() ||
+            find(ref2.incompatible_referees.begin(), ref2.incompatible_referees.end(), code1) != ref2.incompatible_referees.end());
+}
+// Function to check if a referee is incompatible with a team
+bool RA_Input::IsRefereeIncompatibleWithTeam(const string& referee_code, const string& team_code) const {
+    const auto& referee = GetRefereeByCode(referee_code);
+    return find(referee.incompatible_teams.begin(), referee.incompatible_teams.end(), team_code) != referee.incompatible_teams.end();
+}
+
+
 /////////////////////////////////// RA_Output Implementation //////////////////////////////////////
 
 // Builder
@@ -396,6 +435,7 @@ const vector<string>& RA_Output::AssignedRefereesToGame(unsigned game_id) const{
   cout << "Retrieving assigned referees for game ID " << game_id << ".\n";
   return gameAssignments[game_id];
 }
+
 // Function to check if a referee is available for a specific game
 bool RA_Output::RefereeAvailableForGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const {
     for (const auto& unav : referee.unavailabilities) {
@@ -416,24 +456,25 @@ bool RA_Output::RefereeAvailableForGame(const RA_Input::Referee& referee, const 
     }
     return true;
 }
+// Function to check if a referee can attend a game considering travel time
 bool RA_Output::CanAttendGame(const RA_Input::Referee& referee, const RA_Input::Game& new_game) const {
-    // Recupera tutte le partite già assegnate a questo referee
+    // Retrieve all games assigned to the referee
     auto assigned = GamesAssignedToReferee(referee.code);
 
     for (const auto& ag : assigned) {
         const auto& assigned_game = in.gamesData[ag.second.second];
 
-        // Controllo solo se la data è la stessa
+        // Check if the assigned game is on the same day
         if (assigned_game.date.tm_year == new_game.date.tm_year &&
             assigned_game.date.tm_mon  == new_game.date.tm_mon &&
             assigned_game.date.tm_mday == new_game.date.tm_mday) {
 
-            // Calcola tempo fine della partita già assegnata
+            // Calculate end time of the assigned game
             tm end_time = assigned_game.time;
             end_time.tm_hour += 2;
-            mktime(&end_time); // normalize overflow
+            mktime(&end_time); // normalize overflow of time
 
-            // Calcola differenza temporale
+            // Calculate available time between the end of the assigned game and the start of the new game
             tm d1 = assigned_game.date; d1.tm_hour = end_time.tm_hour; d1.tm_min = end_time.tm_min;
             tm d2 = new_game.date;      d2.tm_hour = new_game.time.tm_hour; d2.tm_min = new_game.time.tm_min;
 
@@ -441,32 +482,32 @@ bool RA_Output::CanAttendGame(const RA_Input::Referee& referee, const RA_Input::
             time_t t2 = mktime(&d2);
             double available_minutes = difftime(t2, t1) / 60.0;
 
-            const auto& a1 = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                      [&](const auto& a){ return a.code == assigned_game.arena_code; });
-            const auto& a2 = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                      [&](const auto& a){ return a.code == new_game.arena_code; });
+            const auto& a1 = in.GetArenaByCode(assigned_game.arena_code);
+            const auto& a2 = in.GetArenaByCode(new_game.arena_code);
 
             double travel_minutes = in.TravelTimeBetweenArenas(a1, a2) * 60.0;
 
+            // Check if the available time is sufficient for travel
             if (available_minutes < travel_minutes)
                 return false;
         }
     }
     return true;
 }
+// Function to check if a referee is compatible with the selected referees
 bool RA_Output::IsCompatibleWith(const RA_Input::Referee& ref,
                                  const vector<string>& selected_referees) const {
     for (const auto& other_code : selected_referees) {
-        const auto& other = *find_if(in.refereesData.begin(), in.refereesData.end(),
-                                     [&](const RA_Input::Referee& r) { return r.code == other_code; });
+        const auto& other = in.GetRefereeByCode(other_code);
 
-        if (find(ref.incompatible_referees.begin(), ref.incompatible_referees.end(), other.code) != ref.incompatible_referees.end() ||
-            find(other.incompatible_referees.begin(), other.incompatible_referees.end(), ref.code) != other.incompatible_referees.end()) {
+        if(in.AreRefereesIncompatible(ref.code, other_code)){
+            cerr << "Incompatibility found: Referee " << ref.code << " is incompatible with referee " << other_code << ".\n";
             return false;
         }
     }
     return true;
 }
+
 
 
 
@@ -895,16 +936,15 @@ unsigned RA_Output::TeamIncompatibility() const {
             const string& ref_code = assigned_referees[i];
             
             // Find the referee in the input data
-            const auto& ref = *find_if(in.refereesData.begin(), in.refereesData.end(), [&](const RA_Input::Referee& r) 
-                                      { return r.code == ref_code; });
+            const auto& ref = in.GetRefereeByCode(ref_code);
             
             // Check if the referee is assigned to a game with incompatible teams
-            if (find(ref.incompatible_teams.begin(), ref.incompatible_teams.end(), game.homeTeam_code) != ref.incompatible_teams.end()) {
+            if (in.IsRefereeIncompatibleWithTeam(ref.code, game.homeTeam_code)) {
                 violations++;
                 cerr << "Incompatibility Team violation: Referee " << ref_code << " is assigned to game ID " << g 
                      << " with incompatible team: " << game.homeTeam_code << ".\n";
             }
-            if (find(ref.incompatible_teams.begin(), ref.incompatible_teams.end(), game.guestTeam_code) != ref.incompatible_teams.end()) {
+            if (in.IsRefereeIncompatibleWithTeam(ref.code, game.guestTeam_code)) {
                 violations++;
                 cerr << "Incompatibility Team violation: Referee " << ref_code << " is assigned to game ID " << g 
                      << " with incompatible team: " << game.guestTeam_code << ".\n";
