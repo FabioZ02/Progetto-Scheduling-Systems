@@ -96,7 +96,11 @@ class RA_Output{
   public:
     RA_Output(const RA_Input& i);
     RA_Output& operator=(const RA_Output& out);
-    
+
+    bool RefereeAvailableForGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const;
+    bool CanAttendGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const;
+    bool IsCompatibleWith(const RA_Input::Referee& referee, const vector<string>& selected_referees) const;   
+
     // Hard constraints
     bool NumberOfReferees() const;
     bool FeasibleDistance() const;
@@ -104,7 +108,6 @@ class RA_Output{
     bool Feasibility() const;
 
     void AssignRefereeToGame(unsigned game_id, const string& referee_code);
-    const vector<string>& AssignedRefereesToGame(unsigned game_id) const;
 
     unsigned ComputeViolations() const;
     unsigned ComputeCost() const;
@@ -115,15 +118,17 @@ class RA_Output{
   private:
     const RA_Input& in;
     vector<vector<string>> gameAssignments; // Vector of vectors to store assigned referees for each game
-    vector<pair<tm, pair<tm, unsigned>>> GamesAssignedToReferee(const string& referee_code) const; // (date, (time, game_id))
-    vector<vector<unsigned>> teamAssignmentsPerReferee; // Vector of vectors to store the number of times a referee 
+    vector<vector<unsigned>> teamAssignmentsPerReferee;  // Vector of vectors to store the number of times a referee 
                                                          // has been assigned to a specific team
-    
-    // soft constraints (da implementare)
+
+    const vector<string>& AssignedRefereesToGame(unsigned game_id) const;
+    const vector<pair<tm, pair<tm, unsigned>>> GamesAssignedToReferee(const string& referee_code) const; // (date, (time, game_id))
+
+    // soft constraints
     unsigned RefereeLevel() const;
     unsigned ExperienceNeeded() const;
     unsigned GameDistribution() const;
-    unsigned TotalDistance() const;
+    float TotalDistance() const;
     unsigned OptionalRefereee() const;
     unsigned AssignmentFrequency() const;
     unsigned RefereeIncompatibility() const;

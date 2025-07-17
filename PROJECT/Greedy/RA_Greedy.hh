@@ -4,8 +4,5 @@
 
 int Random(int min, int max);
 void GreedyRASolver(const RA_Input& in, RA_Output& out);
-//void GreedyWLSolverMS(const RA_Input& in, RA_Output& out);
-//void GreedyWLSolverMS_Improved(const WL_Input& in, WL_Output& out);
-//void GreedyWLSolverSS_Improved(const WL_Input& in, WL_Output& out);
 
 #endif

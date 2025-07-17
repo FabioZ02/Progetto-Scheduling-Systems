@@ -8,7 +8,7 @@ CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -O3
 
 # File sorgenti
-SRCS = RA_Main.cc RA_Data.cc
+SRCS = RA_Driver.cc RA_Data.cc RA_Greedy.cc
 
 # File oggetto
 OBJS = $(SRCS:.cc=.o)
