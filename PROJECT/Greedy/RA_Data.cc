@@ -25,7 +25,6 @@ tm parseDate(const string& dateStr) {
     }
     return date;
 }
-
 tm parseTime(const string& timeStr) {
     tm time = {};
     istringstream ss(timeStr);
@@ -241,20 +240,17 @@ float RA_Input::ComputeDistancesBetweenArenas(Arena a1, Arena a2) const{
   float dy = a1.coordinates.second - a2.coordinates.second;
   return sqrt(dx * dx + dy * dy);
 }
-
 // Function that computes the distance between an arena and a referee
 float RA_Input::ComputeDistancesBetweenArenasAndReferees(Arena a, Referee r) const{
   float dx = a.coordinates.first - r.coordinates.first;
   float dy = a.coordinates.second - r.coordinates.second;
   return sqrt(dx * dx + dy * dy);
 }
-
 // Function that computes the travel time between two arenas
 float RA_Input::ComputeTravelTimeBetweenArenas(Arena a1, Arena a2) const{
   const float speed = 60.0;
   return (ComputeDistancesBetweenArenas(a1, a2) / speed);
 }
-
 // Function that computes the travel time between an arena and a referee
 float RA_Input::ComputeTravelTimeBetweenArenasAndReferee(Arena a, Referee r) const{
   const float speed = 60.0;
@@ -357,6 +353,7 @@ const RA_Input::Referee& RA_Input::GetRefereeByCode(const string& code) const {
 
     return *it;
 }
+
 // Function to check if two teams are incompatible
 bool RA_Input::AreRefereesIncompatible(const string& code1, const string& code2) const {
     const auto& ref1 = GetRefereeByCode(code1);
