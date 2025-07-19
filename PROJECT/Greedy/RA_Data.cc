@@ -13,6 +13,8 @@
 
 using namespace std;
 
+#define SPEED 60
+
 /////////////////////////////////// RA_Input Implementation //////////////////////////////////////
 
 // Parsing date and time strings
@@ -232,19 +234,20 @@ RA_Input::RA_Input(string file_name) {
 
 }
 
+// Calculate the distance between two coordinates
+float RA_Input::EuclideanDistance(const pair<float, float>& c1, const pair<float, float>& c2) const{
+    float dx = c1.first - c2.first;
+    float dy = c1.second - c2.second;
+    return sqrt(dx * dx + dy * dy);
+}
 // Si possono unire le due funzioni implementando un valore per scegliere il secondo parametro
 // Function that computes the distance between two arenas
 float RA_Input::ComputeDistancesBetweenArenas(Arena a1, Arena a2) const{
-  // si può usare memoization per evitare di calcolare più volte la stessa distanza (calcolando all'occorrenza i valori richiesti)
-  float dx = a1.coordinates.first - a2.coordinates.first;
-  float dy = a1.coordinates.second - a2.coordinates.second;
-  return sqrt(dx * dx + dy * dy);
+  return RA_Input::EuclideanDistance(a1.coordinates, a2.coordinates);
 }
 // Function that computes the distance between an arena and a referee
 float RA_Input::ComputeDistancesBetweenArenasAndReferees(Arena a, Referee r) const{
-  float dx = a.coordinates.first - r.coordinates.first;
-  float dy = a.coordinates.second - r.coordinates.second;
-  return sqrt(dx * dx + dy * dy);
+    return RA_Input::EuclideanDistance(a.coordinates, r.coordinates);
 }
 // Function that computes the travel time between two arenas
 float RA_Input::ComputeTravelTimeBetweenArenas(Arena a1, Arena a2) const{

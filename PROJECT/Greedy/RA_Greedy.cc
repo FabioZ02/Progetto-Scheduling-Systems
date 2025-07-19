@@ -11,7 +11,6 @@ using namespace std;
 // Solver greedy base
 void GreedyRASolver(const RA_Input& in, RA_Output& out) {
     vector<unsigned> candidates;
-
     srand(time(0));
 
     for (unsigned g = 0; g < in.Games(); g++) {
@@ -21,43 +20,60 @@ void GreedyRASolver(const RA_Input& in, RA_Output& out) {
 
         candidates.clear();
 
-        for (unsigned r = rand()%in.Referees(); r < in.Referees(); r++) {
+        // Shuffle referees to add randomness
+        vector<unsigned> ref_indices(in.Referees()); // a vector of indices of referees
+        iota(ref_indices.begin(), ref_indices.end(), 0);
+        shuffle(ref_indices.begin(), ref_indices.end(), default_random_engine(time(0)));
+
+        for (unsigned i = 0; i < ref_indices.size(); ++i) {
+            unsigned r = ref_indices[i];
             const auto& referee = in.refereesData[r];
+
             if (!out.RefereeAvailableForGame(referee, game)) continue;
             if (!out.CanAttendGame(referee, game)) continue;
 
             candidates.push_back(r);
 
-            // DA CONTROLLARE A RANDOM
-            if ( division.min_referees < candidates.size() ) {
+            // Calculate a probability to stop adding referees which increases with the number of candidates
+            float stopProbability = float(candidates.size()) / float(division.max_referees);
+            if (rand() / float(RAND_MAX) < stopProbability && 
+                candidates.size() > division.min_referees)
                 break;
-            }   
         }
 
+        // Sorting candidates with a score based on level, experience and distance
         sort(candidates.begin(), candidates.end(), [&](unsigned a, unsigned b) {
             const auto& refA = in.refereesData[a];
             const auto& refB = in.refereesData[b];
 
-            bool levelA = refA.level >= division.level;
-            bool levelB = refB.level >= division.level;
-            if (levelA != levelB) return levelA > levelB;
+            // Referee score: +quality, -distance
+            auto compute_score = [&](const RA_Input::Referee& ref) {
+                float score = 0.0f;
+                if (ref.level >= division.level) score += ref.level * 70.0f;
+                score += ref.experience * 50.0f;
+                score -= in.DistanceBetweenArenasAndReferee(arena, ref) * 0.5f;  // penalize distance
+                return score;
+            };
 
-            if (refA.experience != refB.experience)
-                return refA.experience > refB.experience;
+            float scoreA = compute_score(refA);
+            float scoreB = compute_score(refB);
 
-            float distA = in.DistanceBetweenArenasAndReferee(arena, refA);
-            float distB = in.DistanceBetweenArenasAndReferee(arena, refB);
-            return distA < distB;
+            return scoreA > scoreB;
         });
 
         vector<string> selected;
         unsigned total_experience = 0;
 
-        for (unsigned i = 0; i < candidates.size() && selected.size() < division.max_referees; i++) {
+        for (unsigned i = 0; i < candidates.size() && selected.size() <= division.max_referees; i++) {
             const auto& referee = in.refereesData[candidates[i]];
 
-            if (out.IsCompatibleWith(referee, selected)) {
-                if (selected.size() < division.min_referees || total_experience < game.experience_required) {
+            // Check the compatibility between the selected referees, with the teams involved and the ref level
+            if (out.IsCompatibleWith(referee, selected) &&
+                in.IsRefereeIncompatibleWithTeam(referee.code, game.homeTeam_code) &&
+                in.IsRefereeIncompatibleWithTeam(referee.code, game.guestTeam_code) &&
+                referee.level >= division.level) {
+                // The <= is for the Optional Referees Soft Constraint, We also check the ExperienceNeeded Soft Constraint
+                if (selected.size() <= division.min_referees || total_experience < game.experience_required) {
                     out.AssignRefereeToGame(g, referee.code);
                     selected.push_back(referee.code);
                     total_experience += referee.experience;
@@ -65,9 +81,11 @@ void GreedyRASolver(const RA_Input& in, RA_Output& out) {
             }
         }
 
+        // If there are less selected referees try again with the search without optimizing it
         if (selected.size() < division.min_referees) {
             for (unsigned r = 0; r < in.Referees(); r++) {
-                if (selected.size() >= division.min_referees) break;
+                if (selected.size() > division.min_referees && total_experience >= game.experience_required) break;
+
                 const auto& referee = in.refereesData[r];
                 if (find(selected.begin(), selected.end(), referee.code) != selected.end()) continue;
                 if (!out.RefereeAvailableForGame(referee, game)) continue;
@@ -75,6 +93,7 @@ void GreedyRASolver(const RA_Input& in, RA_Output& out) {
                 if (in.IsRefereeIncompatibleWithTeam(referee.code, game.homeTeam_code) ||
                     in.IsRefereeIncompatibleWithTeam(referee.code, game.guestTeam_code)) continue;
                 if (!out.IsCompatibleWith(referee, selected)) continue;
+                if(referee.level >= division.level) continue;
 
                 out.AssignRefereeToGame(g, referee.code);
                 selected.push_back(referee.code);

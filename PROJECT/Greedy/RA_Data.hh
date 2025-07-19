@@ -69,18 +69,17 @@ class RA_Input{
       unsigned experience_required;   // INT Minimum level of experience required by the referees for this game
     };
     vector<Game> gamesData;           // Vector of games
-
-
+    
     // Getters for the distance matrices
     float DistanceBetweenArenas(Arena a1, Arena a2) const {return ComputeDistancesBetweenArenas(a1, a2);}
     float DistanceBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeDistancesBetweenArenasAndReferees(a, r);}
     float TravelTimeBetweenArenas(Arena a1, Arena a2) const {return ComputeTravelTimeBetweenArenas(a1, a2);}
     float TravelTimeBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeTravelTimeBetweenArenasAndReferee(a, r);}
     
-    const Division& GetDivisionByCode(const string& code) const;
-    const Referee& GetRefereeByCode(const string& code) const; // Returns the Referee object by its code
-    const Arena& GetArenaByCode(const string& code) const;  // Returns the Arena object by its code
-    const Team& GetTeamByCode(const string& code) const;
+    const Division& GetDivisionByCode(const string& code) const;  // Returns the Division object by its code
+    const Referee& GetRefereeByCode(const string& code) const;    // Returns the Referee object by its code
+    const Arena& GetArenaByCode(const string& code) const;        // Returns the Arena object by its code
+    const Team& GetTeamByCode(const string& code) const;          // Returns the Team object by its code
     
     bool AreRefereesIncompatible(const string& code1, const string& code2) const; // Checks if two referees are incompatible
     bool IsRefereeIncompatibleWithTeam(const string& referee_code, const string& team_code) const; // Checks if a referee is incompatible with a team
@@ -88,11 +87,7 @@ class RA_Input{
   private:
     unsigned divisions, referees, arenas, teams, games;
 
-    // probabilmente vanno nell'output
-    float ComputeDistancesBetweenArenas(Arena a1, Arena a2) const;
-    float ComputeDistancesBetweenArenasAndReferees(Arena a, Referee r) const;
-    float ComputeTravelTimeBetweenArenas(Arena a1, Arena a2) const;
-    float ComputeTravelTimeBetweenArenasAndReferee(Arena a, Referee r) const;
+    float EuclideanDistance(const pair<float, float>& c1, const pair<float, float>& c2) const;
 };
 
 class RA_Output{
@@ -113,6 +108,8 @@ class RA_Output{
     bool FeasibleDistance() const;
     bool RefereeAvailability() const;
     bool Feasibility() const;
+
+    float TotalDistance() const;
 
     void AssignRefereeToGame(unsigned game_id, const string& referee_code);
 
@@ -135,7 +132,6 @@ class RA_Output{
     unsigned RefereeLevel() const;
     unsigned ExperienceNeeded() const;
     unsigned GameDistribution() const;
-    float TotalDistance() const;
     unsigned OptionalReferee() const;
     unsigned AssignmentFrequency() const;
     unsigned RefereeIncompatibility() const;
