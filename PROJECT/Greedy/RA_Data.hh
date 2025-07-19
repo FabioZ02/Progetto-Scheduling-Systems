@@ -77,8 +77,11 @@ class RA_Input{
     float TravelTimeBetweenArenas(Arena a1, Arena a2) const {return ComputeTravelTimeBetweenArenas(a1, a2);}
     float TravelTimeBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeTravelTimeBetweenArenasAndReferee(a, r);}
     
-    const Arena& GetArenaByCode(const string& code) const;  // Returns the Arena object by its code
+    const Division& GetDivisionByCode(const string& code) const;
     const Referee& GetRefereeByCode(const string& code) const; // Returns the Referee object by its code
+    const Arena& GetArenaByCode(const string& code) const;  // Returns the Arena object by its code
+    const Team& GetTeamByCode(const string& code) const;
+    
     bool AreRefereesIncompatible(const string& code1, const string& code2) const; // Checks if two referees are incompatible
     bool IsRefereeIncompatibleWithTeam(const string& referee_code, const string& team_code) const; // Checks if a referee is incompatible with a team
 
@@ -133,7 +136,7 @@ class RA_Output{
     unsigned ExperienceNeeded() const;
     unsigned GameDistribution() const;
     float TotalDistance() const;
-    unsigned OptionalRefereee() const;
+    unsigned OptionalReferee() const;
     unsigned AssignmentFrequency() const;
     unsigned RefereeIncompatibility() const;
     unsigned TeamIncompatibility() const;

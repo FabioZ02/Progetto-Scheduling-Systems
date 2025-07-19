@@ -4,6 +4,7 @@
 #include <utility>
 #include <cmath>
 #include <climits>
+#include <random>
 
 using namespace std;
 
@@ -11,17 +12,17 @@ using namespace std;
 void GreedyRASolver(const RA_Input& in, RA_Output& out) {
     vector<unsigned> candidates;
 
+    srand(time(0));
+
     for (unsigned g = 0; g < in.Games(); g++) {
         const auto& game = in.gamesData[g];
-        const auto& division = *find_if(in.divisionsData.begin(), in.divisionsData.end(), 
-                                        [&](const auto& d) { return d.code == game.division_code; });
+        const auto& division = in.GetDivisionByCode(game.division_code);
         const auto& arena = in.GetArenaByCode(game.arena_code);
 
         candidates.clear();
 
-        for (unsigned r = 0; r < in.Referees(); r++) {
+        for (unsigned r = rand()%in.Referees(); r < in.Referees(); r++) {
             const auto& referee = in.refereesData[r];
-
             if (!out.RefereeAvailableForGame(referee, game)) continue;
             if (!out.CanAttendGame(referee, game)) continue;
 
@@ -30,8 +31,7 @@ void GreedyRASolver(const RA_Input& in, RA_Output& out) {
             // DA CONTROLLARE A RANDOM
             if ( division.min_referees < candidates.size() ) {
                 break;
-            }
-            
+            }   
         }
 
         sort(candidates.begin(), candidates.end(), [&](unsigned a, unsigned b) {

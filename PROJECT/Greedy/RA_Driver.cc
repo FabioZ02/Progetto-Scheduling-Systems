@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
 
   GreedyRASolver(in, out);
 
-  if (in.Games() <= 50) // print the solution only if small enough
+  if (in.Games() <= 50000000) // print the solution only if small enough
     cout << out << endl;
   cout << "Number of violations: " << out.ComputeViolations() << endl;
   cout << "Cost: " << out.ComputeCost() << endl;
