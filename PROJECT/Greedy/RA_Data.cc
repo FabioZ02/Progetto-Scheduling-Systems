@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define SPEED 60
+#define SPEED 60  // Speed constant to calculate the travelling time
 
 /////////////////////////////////// RA_Input Implementation //////////////////////////////////////
 
@@ -21,7 +21,7 @@ using namespace std;
 tm parseDate(const string& dateStr) {
     tm date = {};
     istringstream ss(dateStr);
-    ss >> get_time(&date, "%d/%m/%Y");  // Usa il formato corretto
+    ss >> get_time(&date, "%d/%m/%Y");  // day, month, year
     if (ss.fail()) {
         std::cerr << "Errore nel parsing della data!\n";
     }
@@ -30,13 +30,13 @@ tm parseDate(const string& dateStr) {
 tm parseTime(const string& timeStr) {
     tm time = {};
     istringstream ss(timeStr);
-    ss >> get_time(&time, "%H:%M");  // Ora e minuti
+    ss >> get_time(&time, "%H:%M");   // Hours and minutes
     if (ss.fail()) {
         std::cerr << "Errore nel parsing dell'orario!\n";
     }
     return time;
 }
-
+// Cleans the input string
 string Trim(const string& str) {
   size_t first = str.find_first_not_of(" \t\n\r");
   if (string::npos == first) return "";
@@ -189,13 +189,13 @@ RA_Input::RA_Input(string file_name) {
         stringstream ss(line);
         ss >> arenasData[a].code;
         
-        ss.ignore(); // Ignora lo spazio
+        ss.ignore(); // Ignore the whitespace
         string coord_str;
         getline(ss, coord_str, ')');
         coord_str.erase(remove(coord_str.begin(), coord_str.end(), '('), coord_str.end());
         stringstream coord_ss(coord_str);
         coord_ss >> arenasData[a].coordinates.first;
-        coord_ss.ignore(); // Ignora la virgola
+        coord_ss.ignore(); // Ignore the comma
         coord_ss >> arenasData[a].coordinates.second;
     }
 
@@ -240,24 +240,21 @@ float RA_Input::EuclideanDistance(const pair<float, float>& c1, const pair<float
     float dy = c1.second - c2.second;
     return sqrt(dx * dx + dy * dy);
 }
-// Si possono unire le due funzioni implementando un valore per scegliere il secondo parametro
 // Function that computes the distance between two arenas
 float RA_Input::ComputeDistancesBetweenArenas(Arena a1, Arena a2) const{
-  return RA_Input::EuclideanDistance(a1.coordinates, a2.coordinates);
+  return EuclideanDistance(a1.coordinates, a2.coordinates);
 }
 // Function that computes the distance between an arena and a referee
 float RA_Input::ComputeDistancesBetweenArenasAndReferees(Arena a, Referee r) const{
-    return RA_Input::EuclideanDistance(a.coordinates, r.coordinates);
+    return EuclideanDistance(a.coordinates, r.coordinates);
 }
 // Function that computes the travel time between two arenas
 float RA_Input::ComputeTravelTimeBetweenArenas(Arena a1, Arena a2) const{
-  const float speed = 60.0;
-  return (ComputeDistancesBetweenArenas(a1, a2) / speed);
+    return (ComputeDistancesBetweenArenas(a1, a2) / SPEED);
 }
 // Function that computes the travel time between an arena and a referee
 float RA_Input::ComputeTravelTimeBetweenArenasAndReferee(Arena a, Referee r) const{
-  const float speed = 60.0;
-  return (ComputeDistancesBetweenArenasAndReferees(a, r) / speed);
+    return (ComputeDistancesBetweenArenasAndReferees(a, r) / SPEED);
 }
 
 ostream& operator<<(ostream& os, const RA_Input& in){
@@ -332,52 +329,44 @@ ostream& operator<<(ostream& os, const RA_Input& in){
   return os;
 }
 
-// Function to find the division by its code
+// Function to find the Division by its code
 const RA_Input::Division& RA_Input::GetDivisionByCode(const string& code) const {
-    auto it = find_if(divisionsData.begin(), divisionsData.end(),
-                      [&](const Division& d) { return d.code == code; });
+    auto it = find_if(divisionsData.begin(), divisionsData.end(), [&](const Division& d) { return d.code == code; });
 
     if (it == divisionsData.end()) {
         std::cerr << "Errore: Divisione con codice '" << code << "' non trovata.\n";
         exit(1);
     }
-
     return *it;
 }
-// Function to find the referee by its code
+// Function to find the Referee by its code
 const RA_Input::Referee& RA_Input::GetRefereeByCode(const string& code) const {
-    auto it = find_if(refereesData.begin(), refereesData.end(),
-                      [&](const Referee& r) { return r.code == code; });
+    auto it = find_if(refereesData.begin(), refereesData.end(), [&](const Referee& r) { return r.code == code; });
 
     if (it == refereesData.end()) {
         std::cerr << "Errore: Arbitro con codice '" << code << "' non trovato.\n";
         exit(1);
     }
-
     return *it;
 }
-// Function to find the arena by its code
+// Function to find the Arena by its code
 const RA_Input::Arena& RA_Input::GetArenaByCode(const string& code) const {
-    auto arena = find_if(arenasData.begin(), arenasData.end(),
-                      [&](const Arena& a) { return a.code == code; });
+    auto arena = find_if(arenasData.begin(), arenasData.end(), [&](const Arena& a) { return a.code == code; });
 
     if (arena == arenasData.end()) {
         std::cerr << "Errore: Arena con codice '" << code << "' non trovata.\n";
         exit(1);
     }
-
     return *arena;
 }
 // Function to find the Team by its code
 const RA_Input::Team& RA_Input::GetTeamByCode(const string& code) const {
-    auto it = find_if(teamsData.begin(), teamsData.end(),
-                      [&](const Team& t) { return t.code == code; });
+    auto it = find_if(teamsData.begin(), teamsData.end(), [&](const Team& t) { return t.code == code; });
 
     if (it == teamsData.end()) {
         std::cerr << "Errore: Team con codice '" << code << "' non trovato.\n";
         exit(1);
     }
-
     return *it;
 }
 
@@ -395,9 +384,7 @@ bool RA_Input::IsRefereeIncompatibleWithTeam(const string& referee_code, const s
     return find(referee.incompatible_teams.begin(), referee.incompatible_teams.end(), team_code) != referee.incompatible_teams.end();
 }
 
-
 /////////////////////////////////// RA_Output Implementation //////////////////////////////////////
-
 // Builder
 RA_Output::RA_Output(const RA_Input& my_in): in(my_in){
     gameAssignments.resize(in.Games());
@@ -425,7 +412,6 @@ void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code
   }
 
   // Add referee code to the vector of referees for this game
-  // cout << "Assigning referee '" << referee_code << "' to game ID " << game_id << ".\n";
   gameAssignments[game_id].push_back(referee_code);
 
   // Update the teamAssignmentsPerReferee vector
@@ -440,8 +426,6 @@ void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code
   teamAssignmentsPerReferee[referee_index][team_index_G]++;
 }
 // Function that returns all the games assigned to a referee
-/* Se le partite sono tante e il codice viene eseguito spesso, puoi pensare a una mappa inversa unordered_map<string, 
-vector<unsigned>>, dove memorizzi per ogni arbitro la lista di partite assegnate. Ma per ora, find va benissimo.*/
 const vector<pair<tm, pair<tm, unsigned>>> RA_Output::GamesAssignedToReferee(const string& referee_code) const {
   vector<pair<tm, pair<tm, unsigned>>> assignedGames; // (date, (time, game_id))
   
@@ -453,11 +437,12 @@ const vector<pair<tm, pair<tm, unsigned>>> RA_Output::GamesAssignedToReferee(con
   
   return assignedGames;
 }
-// Function to retrieve the referees assigned to a specific game DA CANCELLARE O USARE
-const vector<string>& RA_Output::AssignedRefereesToGame(unsigned game_id) const{
-  cout << "Retrieving assigned referees for game ID " << game_id << ".\n";
-  return gameAssignments[game_id];
-}
+// Function to retrieve the referees assigned to a specific game
+// const vector<string>& RA_Output::AssignedRefereesToGame(unsigned game_id) const{
+//   cout << "Retrieving assigned referees for game ID " << game_id << ".\n";
+//   return gameAssignments[game_id];
+// }
+
 
 // Function to check if a referee is available for a specific game
 bool RA_Output::RefereeAvailableForGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const {
@@ -498,7 +483,7 @@ bool RA_Output::CanAttendGame(const RA_Input::Referee& referee, const RA_Input::
             mktime(&end_time); // normalize overflow of time
 
             // Calculate available time between the end of the assigned game and the start of the new game
-            tm d1 = assigned_game.date; d1.tm_hour = end_time.tm_hour; d1.tm_min = end_time.tm_min;
+            tm d1 = assigned_game.date; d1.tm_hour = end_time.tm_hour;      d1.tm_min = end_time.tm_min;
             tm d2 = new_game.date;      d2.tm_hour = new_game.time.tm_hour; d2.tm_min = new_game.time.tm_min;
 
             time_t t1 = mktime(&d1);
@@ -521,7 +506,7 @@ bool RA_Output::CanAttendGame(const RA_Input::Referee& referee, const RA_Input::
 bool RA_Output::IsCompatibleWith(const RA_Input::Referee& ref, const vector<string>& selected_referees) const {
     for (const auto& other_code : selected_referees) {
         if(in.AreRefereesIncompatible(ref.code, other_code)){
-            std::cerr << "Incompatibility found: Referee " << ref.code << " is incompatible with referee " << other_code << ".\n";
+            // std::cerr << "Incompatibility found: Referee " << ref.code << " is incompatible with referee " << other_code << ".\n";
             return false;
         }
     }
@@ -529,10 +514,7 @@ bool RA_Output::IsCompatibleWith(const RA_Input::Referee& ref, const vector<stri
 }
 
 
-
-
-
-// The number of mandatory referees must always be assigned to each game.
+// The number of mandatory referees must always be assigned to each game
 bool RA_Output::NumberOfReferees() const{
   for (unsigned g = 0; g < in.Games(); ++g) {
     const auto& game = in.gamesData[g];
@@ -561,7 +543,7 @@ bool RA_Output::NumberOfReferees() const{
   }
   return true;
 }
-// The distance between the arenas of two consecutive games assigned to the same referee must be feasible.
+// The distance between the arenas of two consecutive games assigned to the same referee must be feasible
 bool RA_Output::FeasibleDistance() const {
   // For each ref, check the game assignment feasibility
   for (const auto& referee : in.refereesData) {
@@ -590,7 +572,7 @@ bool RA_Output::FeasibleDistance() const {
       end_prev.tm_hour += 2;
       mktime(&end_prev); // normalize
 
-      // Compute strart time of next_game
+      // Compute start time of next_game
       tm start_curr = curr.time;
 
       // Compute difference in minutes between the end of the previous game and the start of the current game
@@ -606,21 +588,21 @@ bool RA_Output::FeasibleDistance() const {
       double minutes_between = difftime(t_start_curr, t_end_prev) / 60.0;
 
       // Compute travel time
-      const auto& prev_arena = *find_if(in.arenasData.begin(), in.arenasData.end(), [&](const auto& a) { return a.code == prev.arena_code; });
-      const auto& curr_arena = *find_if(in.arenasData.begin(), in.arenasData.end(), [&](const auto& a) { return a.code == curr.arena_code; });
-      float travel_time = in.TravelTimeBetweenArenas(prev_arena, curr_arena) * 60.0; // in minuti
+      const auto& prev_arena = in.GetArenaByCode(prev.arena_code);
+      const auto& curr_arena = in.GetArenaByCode(curr.arena_code);
+      float travel_time = in.TravelTimeBetweenArenas(prev_arena, curr_arena) * 60.0; // in minutes
 
       if (minutes_between < travel_time) {
-        // std::cerr << "Feasible Distance: Referee " << referee.code << " cannot travel from game " << prev_game
-        //      << " to game " << curr_game << " in time. Required travel time: "
-        //      << travel_time << " minutes, available time: " << minutes_between << " minutes.\n";
+        std::cerr << "Feasible Distance: Referee " << referee.code << " cannot travel from game " << prev_game
+             << " to game " << curr_game << " in time. Required travel time: "
+             << travel_time << " minutes, available time: " << minutes_between << " minutes.\n";
         return false;
       }
     }
   }
   return true;
 }
-// The referee must be available for all the games assigned to them.
+// The referee must be available for all the games assigned to them
 bool RA_Output::RefereeAvailability() const {
   // For each ref, check if they are available for the assigned games
   for (const auto& referee : in.refereesData) {
@@ -659,9 +641,9 @@ bool RA_Output::RefereeAvailability() const {
       }
 
       if (!available) {
-        // std::cerr << "Ref Availability: Referee " << referee.code << " is not available for game ID " << game_id
-        //      << " on " << put_time(&game_date, "%d/%m/%Y") << " at "
-        //      << put_time(&game_time, "%H:%M") << ".\n";
+        std::cerr << "Ref Availability: Referee " << referee.code << " is not available for game ID " << game_id
+             << " on " << put_time(&game_date, "%d/%m/%Y") << " at "
+             << put_time(&game_time, "%H:%M") << ".\n";
         return false;
       }
     }
@@ -679,15 +661,9 @@ unsigned RA_Output::RefereeLevel() const {
     unsigned violations = 0;
     for (unsigned g = 0; g < in.Games(); ++g) {
         const auto& game = in.gamesData[g];
-        unsigned required_level = 0;
-
+        
         // Find the division of the game
-        for (const auto& div : in.divisionsData) {
-            if (div.code == game.division_code) {
-                required_level = div.level;
-                break;
-            }
-        }
+        unsigned required_level = in.GetDivisionByCode(game.division_code).level;
 
         // Check if all assigned referees meet the required level
         for (const auto& referee_code : gameAssignments[g]) {
@@ -712,14 +688,9 @@ unsigned RA_Output::ExperienceNeeded() const {
         const auto& game = in.gamesData[g];
         unsigned total_experience = 0;
 
-        // Check if the sum of the experience of all referees assigned to the game is at 
-        // least the required experience
+        // Check if the sum of the experience of all referees assigned to the game is at least the required experience
         for (const auto& referee_code : gameAssignments[g]) {
-            for (const auto& referee : in.refereesData) {
-                if (referee.code == referee_code) {
-                    total_experience += referee.experience;
-                }
-            }
+            total_experience += in.GetRefereeByCode(referee_code).experience;
         }
 
         // If the total experience is less than the required experience, count a violation
@@ -785,9 +756,8 @@ float RA_Output::TotalDistance() const {
         });
 
         // Group games by day
-        /* SI POTREBBE COSTRUIRE UNA MAPPA ANZICHE' DUE VETTORI PARALLELI*/
-        vector<vector<unsigned>> daily_game_ids; // Vector to hold game IDs for each day
-        vector<tm> daily_dates; // Vector to hold the dates of the games
+        vector<vector<unsigned>> daily_game_ids;      // Vector to hold game IDs for each day
+        vector<tm> daily_dates;                       // Vector to hold the dates of the games
 
         for (const auto& ag : assignedGames) {
             // Check if the date is already in the daily_dates vector
@@ -807,8 +777,7 @@ float RA_Output::TotalDistance() const {
 
             // Get the arena for the first game of the day
             const auto& first_game = in.gamesData[games_in_day[0]];
-            const auto& first_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                               [&](const RA_Input::Arena& a) { return a.code == first_game.arena_code; });
+            const auto& first_arena = in.GetArenaByCode(first_game.arena_code);
 
             // Calculate the distance from referee's home to first arena
             float day_distance = in.DistanceBetweenArenasAndReferee(first_arena, referee);
@@ -818,10 +787,8 @@ float RA_Output::TotalDistance() const {
                 const auto& prev_game = in.gamesData[games_in_day[i - 1]];
                 const auto& curr_game = in.gamesData[games_in_day[i]];
 
-                const auto& prev_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                                  [&](const RA_Input::Arena& a) { return a.code == prev_game.arena_code; });
-                const auto& curr_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                                  [&](const RA_Input::Arena& a) { return a.code == curr_game.arena_code; });
+                const auto& prev_arena = in.GetArenaByCode(prev_game.arena_code);
+                const auto& curr_arena = in.GetArenaByCode(curr_game.arena_code);
 
                 // Calculate the distance between the previous arena and the current arena
                 float distance_between_arenas = in.DistanceBetweenArenas(prev_arena, curr_arena);
@@ -830,8 +797,7 @@ float RA_Output::TotalDistance() const {
 
             // Calculate the distance from the last arena back to home
             const auto& last_game = in.gamesData[games_in_day.back()];
-            const auto& last_arena = *find_if(in.arenasData.begin(), in.arenasData.end(),
-                                              [&](const RA_Input::Arena& a) { return a.code == last_game.arena_code; });
+            const auto& last_arena = in.GetArenaByCode(last_game.arena_code);
 
             day_distance += in.DistanceBetweenArenasAndReferee(last_arena, referee);
 

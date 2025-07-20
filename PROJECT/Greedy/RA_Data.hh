@@ -20,7 +20,7 @@ class RA_Input{
     unsigned Arenas() const { return arenas; }
     unsigned Teams() const { return teams; }
     unsigned Games() const { return games; }
-
+    
     // le strutture possono essere private?
     // Division Data structure
     struct Division {
@@ -63,23 +63,23 @@ class RA_Input{
       string homeTeam_code;         // T1 Code of the first team
       string guestTeam_code;        // T2 Code of the second team
       string division_code;         // D1 Code of the division to which the game belongs
-      tm date;                  // Date of the game (day, month, year)
-      tm time;                  // Time of the game (hour, minute)
+      tm date;                      // Date of the game (day, month, year)
+      tm time;                      // Time of the game (hour, minute)
       string arena_code;            // A1 Code of the arena where the game is played
-      unsigned experience_required;   // INT Minimum level of experience required by the referees for this game
+      unsigned experience_required; // INT Minimum level of experience required by the referees for this game
     };
-    vector<Game> gamesData;           // Vector of games
-    
-    // Getters for the distance matrices
-    float DistanceBetweenArenas(Arena a1, Arena a2) const {return ComputeDistancesBetweenArenas(a1, a2);}
-    float DistanceBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeDistancesBetweenArenasAndReferees(a, r);}
-    float TravelTimeBetweenArenas(Arena a1, Arena a2) const {return ComputeTravelTimeBetweenArenas(a1, a2);}
-    float TravelTimeBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeTravelTimeBetweenArenasAndReferee(a, r);}
-    
+    vector<Game> gamesData;         // Vector of games
+
     const Division& GetDivisionByCode(const string& code) const;  // Returns the Division object by its code
     const Referee& GetRefereeByCode(const string& code) const;    // Returns the Referee object by its code
     const Arena& GetArenaByCode(const string& code) const;        // Returns the Arena object by its code
     const Team& GetTeamByCode(const string& code) const;          // Returns the Team object by its code
+
+    // Getters for the distance values
+    float DistanceBetweenArenas(Arena a1, Arena a2) const {return ComputeDistancesBetweenArenas(a1, a2);}
+    float DistanceBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeDistancesBetweenArenasAndReferees(a, r);}
+    float TravelTimeBetweenArenas(Arena a1, Arena a2) const {return ComputeTravelTimeBetweenArenas(a1, a2);}
+    float TravelTimeBetweenArenasAndReferee(Arena a, Referee r) const {return ComputeTravelTimeBetweenArenasAndReferee(a, r);}
     
     bool AreRefereesIncompatible(const string& code1, const string& code2) const; // Checks if two referees are incompatible
     bool IsRefereeIncompatibleWithTeam(const string& referee_code, const string& team_code) const; // Checks if a referee is incompatible with a team
@@ -87,7 +87,9 @@ class RA_Input{
   private:
     unsigned divisions, referees, arenas, teams, games;
 
-    float EuclideanDistance(const pair<float, float>& c1, const pair<float, float>& c2) const;
+    float EuclideanDistance(const pair<float, float>& c1, const pair<float, float>& c2) const;  // Calculate the Euclidean distance between two coordinates
+    
+    // The effective methods to calculate the distances
     float ComputeDistancesBetweenArenas(Arena a1, Arena a2) const;
     float ComputeDistancesBetweenArenasAndReferees(Arena a, Referee r) const;
     float ComputeTravelTimeBetweenArenas(Arena a1, Arena a2) const;
@@ -103,36 +105,37 @@ class RA_Output{
     RA_Output(const RA_Input& i);
     RA_Output& operator=(const RA_Output& out);
 
-    bool RefereeAvailableForGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const;
-    bool CanAttendGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const;
-    bool IsCompatibleWith(const RA_Input::Referee& referee, const vector<string>& selected_referees) const;   
+    bool RefereeAvailableForGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const;       // Checks if a Referee is available for game
+    bool CanAttendGame(const RA_Input::Referee& referee, const RA_Input::Game& game) const;                 // Checks if a Referee can reach the game's arena
+    bool IsCompatibleWith(const RA_Input::Referee& referee, const vector<string>& selected_referees) const; // Checks if a Referee can attend a game with the other selected referees
+
+    bool Feasibility() const;     // Checks if a solution is feasible (with the Hard constraints)
+
+    float TotalDistance() const;  // Checks the total distance computed by the selected referees
+
+    void AssignRefereeToGame(unsigned game_id, const string& referee_code); // Main method to assign a referee to a game
+
+    unsigned ComputeCost() const;       // Calculate the total cost of the solution
+    unsigned ComputeViolations() const; // Calculate all the violations (made by soft constraints)
+
+    void Reset();                   // Reset the output
+    void Dump(ostream& os) const;   // Shows all the output
+
+  private:
+    const RA_Input& in;
+    vector<vector<string>> gameAssignments;               // Vector of vectors to store assigned referees for each game
+    vector<vector<unsigned>> teamAssignmentsPerReferee;   // Vector of vectors to store the number of times a referee has been assigned to a specific team
+
+    const vector<string>& AssignedRefereesToGame(unsigned game_id) const;   // Returns the assigned referees (in a vector of strings) for game_id
+    const vector<pair<tm, pair<tm, unsigned>>> GamesAssignedToReferee(const string& referee_code) const;  // Returns the games assigned to referee_code
+                                                                                                          // in this format --> (date, (time, game_id))
 
     // Hard constraints
     bool NumberOfReferees() const;
     bool FeasibleDistance() const;
     bool RefereeAvailability() const;
-    bool Feasibility() const;
 
-    float TotalDistance() const;
-
-    void AssignRefereeToGame(unsigned game_id, const string& referee_code);
-
-    unsigned ComputeViolations() const;
-    unsigned ComputeCost() const;
-
-    void Reset();
-    void Dump(ostream& os) const;
-
-  private:
-    const RA_Input& in;
-    vector<vector<string>> gameAssignments; // Vector of vectors to store assigned referees for each game
-    vector<vector<unsigned>> teamAssignmentsPerReferee;  // Vector of vectors to store the number of times a referee 
-                                                         // has been assigned to a specific team
-
-    const vector<string>& AssignedRefereesToGame(unsigned game_id) const;
-    const vector<pair<tm, pair<tm, unsigned>>> GamesAssignedToReferee(const string& referee_code) const; // (date, (time, game_id))
-
-    // soft constraints
+    // Soft constraints
     unsigned RefereeLevel() const;
     unsigned ExperienceNeeded() const;
     unsigned GameDistribution() const;
