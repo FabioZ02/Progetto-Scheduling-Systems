@@ -370,7 +370,7 @@ const RA_Input::Team& RA_Input::GetTeamByCode(const string& code) const {
     return *it;
 }
 
-// Function to check if two teams are incompatible
+// Function to check if two Referees are incompatible
 bool RA_Input::AreRefereesIncompatible(const string& code1, const string& code2) const {
     const auto& ref1 = GetRefereeByCode(code1);
     const auto& ref2 = GetRefereeByCode(code2);
@@ -378,7 +378,7 @@ bool RA_Input::AreRefereesIncompatible(const string& code1, const string& code2)
     return (find(ref1.incompatible_referees.begin(), ref1.incompatible_referees.end(), code2) != ref1.incompatible_referees.end() ||
             find(ref2.incompatible_referees.begin(), ref2.incompatible_referees.end(), code1) != ref2.incompatible_referees.end());
 }
-// Function to check if a referee is incompatible with a team
+// Function to check if a Referee is incompatible with a Team
 bool RA_Input::IsRefereeIncompatibleWithTeam(const string& referee_code, const string& team_code) const {
     const auto& referee = GetRefereeByCode(referee_code);
     return find(referee.incompatible_teams.begin(), referee.incompatible_teams.end(), team_code) != referee.incompatible_teams.end();
@@ -801,10 +801,10 @@ float RA_Output::TotalDistance() const {
 
             day_distance += in.DistanceBetweenArenasAndReferee(last_arena, referee);
 
-            distance_per_referee += day_distance;
+            distance_per_referee += day_distance; // Add the distance to the total distance of the referee
         }
 
-        total_distance += distance_per_referee;
+        total_distance += distance_per_referee; // Add the distance to the total distance
     }
 
     return total_distance;
@@ -817,15 +817,9 @@ unsigned RA_Output::OptionalReferee() const {
         unsigned assigned_referees = gameAssignments[g].size();
 
         // Find the minimum number of referees allowed for the division of the game
-        unsigned min_referees = 1; // default value
-        for (const auto& div : in.divisionsData) {
-            if (div.code == game.division_code) {
-                min_referees = div.min_referees;
-                break;
-            }
-        }
-        // Check if the number of assigned referees is less or equal to the minimum required
-        // so there are no optional referees
+        unsigned min_referees = in.GetDivisionByCode(game.division_code).min_referees;
+
+        // Check if the number of assigned referees is less or equal to the minimum required so there are no optional referees
         if(assigned_referees <= min_referees) {
             // std::cerr << "Optional Referee violation: Game " << g << " has " << assigned_referees 
             //      << " referees assigned, which is less than or equal to the minimum required of " 
@@ -879,26 +873,11 @@ unsigned RA_Output::RefereeIncompatibility() const {
 
         // Check each pair of assigned referees for incompatibility
         for (size_t i = 0; i < assigned_referees.size(); ++i) {
-            for (size_t j = i + 1; j < assigned_referees.size(); ++j) {
-                //DA CAMBIARE E METTERE CON ISCOMPATIBLEWITH
-                
-                
-                const string& ref1_code = assigned_referees[i];
-                const string& ref2_code = assigned_referees[j];
-
-                // Find the referees in the input data
-                const auto& ref1 = *find_if(in.refereesData.begin(), in.refereesData.end(),
-                                             [&](const RA_Input::Referee& r) { return r.code == ref1_code; });
-                const auto& ref2 = *find_if(in.refereesData.begin(), in.refereesData.end(),
-                                             [&](const RA_Input::Referee& r) { return r.code == ref2_code; });
-
-                // Check if they are incompatible
-                if (find(ref1.incompatible_referees.begin(), ref1.incompatible_referees.end(), ref2_code) != ref1.incompatible_referees.end() ||
-                    find(ref2.incompatible_referees.begin(), ref2.incompatible_referees.end(), ref1_code) != ref2.incompatible_referees.end()) {
-                    violations++;
-                    // std::cerr << "Incompatibility Referee violation: Referee " << ref1_code << " and Referee " << ref2_code
-                    //      << " are assigned to game ID " << g << ".\n";
-                }
+            // Check if it's compatible with the other referees in list
+            if (!IsCompatibleWith(in.GetRefereeByCode(assigned_referees[i]), assigned_referees)) {
+                violations++;
+                // std::cerr << "Incompatibility Referee violation: Referee " << ref1_code << " and Referee " << ref2_code
+                //      << " are assigned to game ID " << g << ".\n";
             }
         }
     }
@@ -940,21 +919,20 @@ unsigned RA_Output::TeamIncompatibility() const {
 // Function to compute the total number of violations
 unsigned RA_Output::ComputeViolations() const {
   unsigned tot = 0;
-  tot += RefereeLevel(); cout << RefereeLevel() << "\n";
-  tot += ExperienceNeeded(); cout << ExperienceNeeded() << "\n";
-  tot += GameDistribution(); cout << GameDistribution() << "\n";
-  // tot += TotalDistance(); cout << TotalDistance() << "\n";
-  tot += OptionalReferee(); cout << OptionalReferee() << "\n";
-  tot += AssignmentFrequency(); cout << AssignmentFrequency() << "\n";
-  tot += RefereeIncompatibility(); cout << RefereeIncompatibility() << "\n";
-  tot += TeamIncompatibility(); cout << TeamIncompatibility() << "\n";
+  tot += RefereeLevel(); cout << "RefereeLevel:" << RefereeLevel() << "\n";
+  tot += ExperienceNeeded(); cout << "ExperienceNeeded:" << ExperienceNeeded() << "\n";
+  tot += GameDistribution(); cout << "GameDistribution:" <<  GameDistribution() << "\n";
+  // tot += TotalDistance(); cout << "TotalDistance:" << TotalDistance() << "\n";
+  tot += OptionalReferee(); cout << "OptionalReferee:" << OptionalReferee() << "\n";
+  tot += AssignmentFrequency(); cout << "AssignmentFrequency:" << AssignmentFrequency() << "\n";
+  tot += RefereeIncompatibility(); cout << "RefereeIncompatibility:" <<  RefereeIncompatibility() << "\n";
+  tot += TeamIncompatibility(); cout << "TeamIncompatibility:" << TeamIncompatibility() << "\n";
   return tot;
 }
 // Function to compute the cost of the solution
 unsigned RA_Output::ComputeCost() const{
   return 70 * RefereeLevel() + 50 * ExperienceNeeded() +
-         20 * GameDistribution() + 
-         // 100 * TotalDistance() +
+         20 * GameDistribution() + // 100 * TotalDistance() +
          10 * OptionalReferee() + 50 * AssignmentFrequency() +
          35 * RefereeIncompatibility() + 45 * TeamIncompatibility();
 }
@@ -973,19 +951,6 @@ void RA_Output::Dump(ostream& os) const {
       os << " " << r;
     os << "\n";
   }
-
-  // os << "Total violations: " << ComputeViolations() << "\n \n";
-  // os << "Total cost: " << ComputeCost() << "\n \n";
-  
-  // for (unsigned r = 0; r < in.Referees(); ++r) {
-  //   os << "Referee " << in.refereesData[r].code << " assigned to teams:\n";
-  //   for (unsigned t = 0; t < in.Teams(); ++t) {
-  //     if (teamAssignmentsPerReferee[r][t] > 0) {
-  //       os << "  Team " << in.teamsData[t].code << ": " << teamAssignmentsPerReferee[r][t] << " times\n";
-  //     }
-  //   }
-  // }
-  // os << "\n \n";
 }
 
 ostream& operator<<(ostream& os, const RA_Output& out){

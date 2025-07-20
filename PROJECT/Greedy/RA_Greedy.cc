@@ -8,93 +8,94 @@
 
 using namespace std;
 
-// Solver greedy base
+// Base greedy solver for referee assignment problem with more soft constraints 
 void GreedyRASolver(const RA_Input& in, RA_Output& out) {
     vector<unsigned> candidates;
-    srand(time(0));
+    srand(time(0));  // Initialize random seed for stochastic behavior
 
+    // Iterate over all games
     for (unsigned g = 0; g < in.Games(); g++) {
         const auto& game = in.gamesData[g];
         const auto& division = in.GetDivisionByCode(game.division_code);
         const auto& arena = in.GetArenaByCode(game.arena_code);
 
-        candidates.clear();
+        candidates.clear();  // Clear candidate list for current game
 
-        // Shuffle referees to add randomness
-        vector<unsigned> ref_indices(in.Referees()); // a vector of indices of referees
+        // Generate and shuffle referee indices to introduce randomness in candidate selection
+        vector<unsigned> ref_indices(in.Referees());
         iota(ref_indices.begin(), ref_indices.end(), 0);
         shuffle(ref_indices.begin(), ref_indices.end(), default_random_engine(time(0)));
 
+        // Select candidate referees who are available and can attend the game
         for (unsigned i = 0; i < ref_indices.size(); ++i) {
             unsigned r = ref_indices[i];
             const auto& referee = in.refereesData[r];
 
+            // Check hard constraints: availability and feasibility (e.g., travel time)
             if (!out.RefereeAvailableForGame(referee, game)) continue;
             if (!out.CanAttendGame(referee, game)) continue;
 
             candidates.push_back(r);
 
-            // Calculate a probability to stop adding referees which increases with the number of candidates
+            // Randomized early stopping: more likely to stop as we approach max referees
             float stopProbability = float(candidates.size()) / float(division.max_referees);
-            if (rand() / float(RAND_MAX) < stopProbability && 
-                candidates.size() > division.min_referees)
-                break;
+            if (rand() / float(RAND_MAX) < stopProbability && candidates.size() > division.min_referees) break;
         }
 
-        // Sorting candidates with a score based on level, experience and distance
+        // Sort candidates using a custom score function based on soft preferences
         sort(candidates.begin(), candidates.end(), [&](unsigned a, unsigned b) {
             const auto& refA = in.refereesData[a];
             const auto& refB = in.refereesData[b];
 
-            // Referee score: +quality, -distance
+            // Score function prioritizes level, experience, and proximity
             auto compute_score = [&](const RA_Input::Referee& ref) {
                 float score = 0.0f;
                 if (ref.level >= division.level) score += ref.level * 70.0f;
                 score += ref.experience * 50.0f;
-                score -= in.DistanceBetweenArenasAndReferee(arena, ref) * 0.5f;  // penalize distance
+                score -= in.DistanceBetweenArenasAndReferee(arena, ref) * 0.5f;  // Penalize distant referees
                 return score;
             };
 
-            float scoreA = compute_score(refA);
-            float scoreB = compute_score(refB);
-
-            return scoreA > scoreB;
+            return compute_score(refA) > compute_score(refB);  // Descending order
         });
 
         vector<string> selected;
         unsigned total_experience = 0;
 
+        // Assign referees from sorted candidates, respecting max_referees
         for (unsigned i = 0; i < candidates.size() && selected.size() <= division.max_referees; i++) {
+            // Stop early if experience and minimum referee count are satisfied
+            if (selected.size() > division.min_referees && total_experience >= game.experience_required) break;
+
             const auto& referee = in.refereesData[candidates[i]];
 
-            // Check the compatibility between the selected referees, with the teams involved and the ref level
-            if (out.IsCompatibleWith(referee, selected) &&
-                in.IsRefereeIncompatibleWithTeam(referee.code, game.homeTeam_code) &&
-                in.IsRefereeIncompatibleWithTeam(referee.code, game.guestTeam_code) &&
-                referee.level >= division.level) {
-                // The <= is for the Optional Referees Soft Constraint, We also check the ExperienceNeeded Soft Constraint
-                if (selected.size() <= division.min_referees || total_experience < game.experience_required) {
-                    out.AssignRefereeToGame(g, referee.code);
-                    selected.push_back(referee.code);
-                    total_experience += referee.experience;
-                }
+            // Check compatibility with already assigned referees and required level
+            if (out.IsCompatibleWith(referee, selected) && referee.level >= division.level) {
+                out.AssignRefereeToGame(g, referee.code);
+                selected.push_back(referee.code);
+                total_experience += referee.experience;
             }
         }
 
-        // If there are less selected referees try again with the search without optimizing it
+        // Fallback: assign additional referees in a second pass if not enough were selected
         if (selected.size() < division.min_referees) {
             for (unsigned r = 0; r < in.Referees(); r++) {
+                // Stop if both referee count and required experience are met
                 if (selected.size() > division.min_referees && total_experience >= game.experience_required) break;
 
                 const auto& referee = in.refereesData[r];
+
+                // Skip if referee is already selected
                 if (find(selected.begin(), selected.end(), referee.code) != selected.end()) continue;
+
+                // Check again basic feasibility and incompatibilities
                 if (!out.RefereeAvailableForGame(referee, game)) continue;
                 if (!out.CanAttendGame(referee, game)) continue;
                 if (in.IsRefereeIncompatibleWithTeam(referee.code, game.homeTeam_code) ||
                     in.IsRefereeIncompatibleWithTeam(referee.code, game.guestTeam_code)) continue;
                 if (!out.IsCompatibleWith(referee, selected)) continue;
-                if(referee.level >= division.level) continue;
 
+                // Assign referee in fallback mode
                 out.AssignRefereeToGame(g, referee.code);
                 selected.push_back(referee.code);
                 total_experience += referee.experience;
@@ -103,156 +104,128 @@ void GreedyRASolver(const RA_Input& in, RA_Output& out) {
     }
 }
 
-// Solver greedy migliorato con priorità ai giochi più difficili
+/// Improved greedy solver with prioritization of harder games
 void GreedyRASolver_Improved(const RA_Input& in, RA_Output& out) {
-    // Crea vettore di indici dei giochi
+    // Create a vector of game indices [0, ..., Games()-1]
     vector<unsigned> gameIndices(in.Games());
     for (unsigned i = 0; i < in.Games(); i++) {
         gameIndices[i] = i;
     }
-    
-    // Ordina i giochi per priorità (esperienza richiesta, numero di arbitri necessari)
+
+    // Sort games by priority: experience required, number of referees, division level
     sort(gameIndices.begin(), gameIndices.end(), [&](unsigned a, unsigned b) {
         const RA_Input::Game& gameA = in.gamesData[a];
         const RA_Input::Game& gameB = in.gamesData[b];
-        
-        // Priorità ai giochi con più esperienza richiesta
+
+        // Prefer games with higher required experience
         if (gameA.experience_required != gameB.experience_required)
             return gameA.experience_required > gameB.experience_required;
-        
-        // Trova le divisioni
-        const RA_Input::Division* divA = nullptr;
-        const RA_Input::Division* divB = nullptr;
-        
-        for (const auto& div : in.divisionsData) {
-            if (div.code == gameA.division_code) divA = &div;
-            if (div.code == gameB.division_code) divB = &div;
-        }
-        
+
+        // Retrieve divisions of the games
+        const RA_Input::Division* divA = &in.GetDivisionByCode(gameA.division_code);
+        const RA_Input::Division* divB = &in.GetDivisionByCode(gameB.division_code);
+
         if (divA && divB) {
-            // Priorità ai giochi con più arbitri necessari
+            // Prefer games requiring more referees
             if (divA->min_referees != divB->min_referees)
                 return divA->min_referees > divB->min_referees;
-            
-            // Priorità ai giochi con livello più alto
+
+            // Prefer higher-level divisions
             if (divA->level != divB->level)
                 return divA->level > divB->level;
         }
-        
+
+        // No preference
         return false;
     });
-    
-    // Conta le assegnazioni per referee per bilanciare il carico
+
+    // Track how many games each referee has been assigned to
     vector<unsigned> refereeAssignments(in.Referees(), 0);
-    
-    // Processa i giochi in ordine di priorità
+
+    // Process each game in the sorted (prioritized) order
     for (unsigned gameIdx : gameIndices) {
         const RA_Input::Game& game = in.gamesData[gameIdx];
-        
-        // Trova la divisione corrispondente
-        const RA_Input::Division* division = nullptr;
-        for (const auto& div : in.divisionsData) {
-            if (div.code == game.division_code) {
-                division = &div;
-                break;
-            }
-        }
-        
+
+        // Get the corresponding division and arena
+        const RA_Input::Division* division = &in.GetDivisionByCode(game.division_code);
         if (!division) continue;
-        
-        // Trova l'arena
-        RA_Input::Arena arena;
-        for (const auto& a : in.arenasData) {
-            if (a.code == game.arena_code) {
-                arena = a;
-                break;
-            }
-        }
-        
-        // Crea vettore di coppie (referee_index, score)
+
+        RA_Input::Arena arena = in.GetArenaByCode(game.arena_code);
+
+        // List of candidate referees with computed scores
         vector<pair<unsigned, float>> refereeScores;
-        
+
         for (unsigned r = 0; r < in.Referees(); r++) {
             const RA_Input::Referee& referee = in.refereesData[r];
-            
-            // Controlla disponibilità base
+
+            // Check basic constraints: availability and feasibility
             if (!out.RefereeAvailableForGame(referee, game)) continue;
             if (!out.CanAttendGame(referee, game)) continue;
-            
-            // Calcola score (più alto = migliore)
+
             float score = 0.0f;
-            
-            // Bonus per livello adeguato
-            if (referee.level >= division->level) score += 100.0f;
-            
-            // Bonus per esperienza
+
+            // Reward adequate level
+            if (referee.level >= division->level) score += referee.level * 70.0f;
+
+            // Reward experience
             score += referee.experience * 10.0f;
-            
-            // Malus per distanza
-            float distance = in.DistanceBetweenArenasAndReferee(arena, referee);
-            score -= distance * 0.1f;
-            
-            // Malus per bilanciamento del carico
+
+            // Penalize distance
+            score -= in.DistanceBetweenArenasAndReferee(arena, referee) * 0.5f;
+
+            // Penalize overused referees (load balancing)
             score -= refereeAssignments[r] * 5.0f;
-            
-            // Bonus se può soddisfare l'esperienza richiesta
+
+            // Reward if experience satisfies game's required experience
             if (referee.experience >= game.experience_required) score += 50.0f;
-            
-            refereeScores.push_back(make_pair(r, score));
+
+            refereeScores.emplace_back(r, score);
         }
-        
-        // Ordina per score decrescente
+
+        // Sort referees by descending score
         sort(refereeScores.begin(), refereeScores.end(), [](const pair<unsigned, float>& a, const pair<unsigned, float>& b) {
             return a.second > b.second;
         });
-        
-        // Assegna gli arbitri migliori
+
         vector<string> selected;
+
+        unsigned totalExperience = 0;
+
+        // Assign referees greedily based on scores
         for (const auto& refScore : refereeScores) {
             if (selected.size() >= division->max_referees) break;
-            
+
             unsigned refIdx = refScore.first;
             const RA_Input::Referee& referee = in.refereesData[refIdx];
-            
-            // Controlla compatibilità
+
+            // Check compatibility with previously selected referees
             if (out.IsCompatibleWith(referee, selected)) {
                 out.AssignRefereeToGame(gameIdx, referee.code);
                 selected.push_back(referee.code);
                 refereeAssignments[refIdx]++;
-                
-                // Stop se abbiamo raggiunto il minimo e l'esperienza richiesta
-                if (selected.size() >= division->min_referees) {
-                    unsigned totalExperience = 0;
-                    for (const string& sel : selected) {
-                        for (const auto& ref : in.refereesData) {
-                            if (ref.code == sel) {
-                                totalExperience += ref.experience;
-                                break;
-                            }
-                        }
-                    }
-                    if (totalExperience >= game.experience_required) break;
-                }
+                totalExperience += in.refereesData[refIdx].experience;
+
+                // Stop early if min referees and experience are satisfied
+                if (selected.size() >= division->min_referees && totalExperience >= game.experience_required) break;
             }
         }
-        
-        // Fallback: assegna arbitri casuali se non abbiamo il minimo
+
+        // Fallback: try to assign more referees if minimum is not met
         if (selected.size() < division->min_referees) {
             for (unsigned r = 0; r < in.Referees(); r++) {
                 if (selected.size() >= division->min_referees) break;
-                
+
                 const RA_Input::Referee& referee = in.refereesData[r];
-                
-                // Controlla se non è già stato selezionato
-                bool already_selected = false;
-                for (const string& sel : selected) {
-                    if (sel == referee.code) {
-                        already_selected = true;
-                        break;
-                    }
-                }
-                
-                if (!already_selected) {
+
+                // Skip already selected referees
+                if (find(selected.begin(), selected.end(), referee.code) != selected.end()) continue;
+
+                // Basic feasibility checks
+                if (!out.RefereeAvailableForGame(referee, game)) continue;
+                if (!out.CanAttendGame(referee, game)) continue;
+
+                // Assign if compatible
+                if (out.IsCompatibleWith(referee, selected)) {
                     out.AssignRefereeToGame(gameIdx, referee.code);
                     selected.push_back(referee.code);
                     refereeAssignments[r]++;

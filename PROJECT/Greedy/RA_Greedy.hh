@@ -7,7 +7,7 @@
 // Solver greedy base
 void GreedyRASolver(const RA_Input& in, RA_Output& out);
 
-// Solver greedy migliorato con prioritizzazione dei giochi
+// Improved solver greedy with prioritized games
 void GreedyRASolver_Improved(const RA_Input& in, RA_Output& out);
 
 #endif

@@ -1,47 +1,35 @@
 #!/bin/bash
 
-# Pulizia dei file compilati
-echo "Eseguendo make clean..."
+# Clear previous build artifacts
+echo "[INFO] Cleaning project..."
 make clean
 
-# Compilazione del progetto
-echo "Eseguendo make..."
+# Compile the project
+echo "[INFO] Building project..."
 make
 
-# Esecuzione dei test per ogni file wlp da 1 a 10
-for i in {1..10}; do
-    echo "Eseguendo test per wlp$i..."
-    ./wlp --main::instance ./Instances/wlp$i.dzn --main::method HC --HC::max_evaluations 100000000 --HC::max_idle_iterations 1000000
-    echo "Risultato per wlp$i completato."
-    echo "-----------------------------"
+# Folder containing the instances
+INSTANCE_FOLDER="./Instances"
+
+# Binary name
+EXECUTABLE="./ra"
+
+# Check if compilation succeeded
+if [ ! -f "$EXECUTABLE" ]; then
+    echo "[ERROR] Compilation failed or ra executable not found."
+    exit 1
+fi
+
+echo ""
+echo "========== Starting Referee Assignment Tests =========="
+
+# Loop through each RA-*.txt file in the Instances folder
+for instance in "$INSTANCE_FOLDER"/RA-*.txt; do
+    echo ""
+    echo ">>> Running test for: $(basename "$instance")"
+    $EXECUTABLE "$instance"
+    echo "------------------------------------------------------"
 done
 
-echo "Eseguendo test per wlp12.."
-./wlp --main::instance ./Instances/wlp12.dzn --main::method HC --HC::max_evaluations 100000000 --HC::max_idle_iterations 1000000
-echo "Risultato per wlp12 completato.."
-echo "--------------------------"
-
-echo "Eseguendo test per wlp15.."
-./wlp --main::instance ./Instances/wlp15.dzn --main::method HC --HC::max_evaluations 100000000 --HC::max_idle_iterations 1000000
-echo "Risultato per wlp15 completato.."
-echo "--------------------------"
-
-echo "Eseguendo test per wlp20.."
-./wlp --main::instance ./Instances/wlp20.dzn --main::method HC --HC::max_evaluations 100000000 --HC::max_idle_iterations 1000000
-echo "Risultato per wlp20 completato.."
-echo "--------------------------"
-
-echo "Eseguendo test per wlp30.."
-./wlp --main::instance ./Instances/wlp30.dzn --main::method HC --HC::max_evaluations 100000000 --HC::max_idle_iterations 1000000
-echo "Risultato per wlp30 completato.."
-echo "--------------------------"
-
-echo "Eseguendo test per wlp50.."
-./wlp --main::instance ./Instances/wlp50.dzn --main::method HC --HC::max_evaluations 100000000 --HC::max_idle_iterations 1000000
-echo "Risultato per wlp50 completato.."
-echo "--------------------------"
-
-echo "Eseguendo test per wlp100.."
-./wlp --main::instance ./Instances/wlp100.dzn --main::method HC --HC::max_evaluations 100000000 --HC::max_idle_iterations 1000000
-echo "Risultato per wlp100 completato.."
-echo "--------------------------"
+echo ""
+echo "✅ All tests completed."
