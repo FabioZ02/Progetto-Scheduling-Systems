@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
     
     for (int trial = 0; trial < 20; trial++) {
         RA_Output trial_output(in);
-        GreedyRASolver(in, trial_output); // or Improved
+        GreedyRASolver_Improved(in, trial_output); // or Improved
 
         // It saves the best output based only on the total cost
         float dist = trial_output.TotalDistance();

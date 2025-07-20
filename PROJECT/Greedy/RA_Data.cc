@@ -23,7 +23,7 @@ tm parseDate(const string& dateStr) {
     istringstream ss(dateStr);
     ss >> get_time(&date, "%d/%m/%Y");  // Usa il formato corretto
     if (ss.fail()) {
-        cerr << "Errore nel parsing della data!\n";
+        std::cerr << "Errore nel parsing della data!\n";
     }
     return date;
 }
@@ -32,7 +32,7 @@ tm parseTime(const string& timeStr) {
     istringstream ss(timeStr);
     ss >> get_time(&time, "%H:%M");  // Ora e minuti
     if (ss.fail()) {
-        cerr << "Errore nel parsing dell'orario!\n";
+        std::cerr << "Errore nel parsing dell'orario!\n";
     }
     return time;
 }
@@ -47,7 +47,7 @@ string Trim(const string& str) {
 RA_Input::RA_Input(string file_name) {
     ifstream is(file_name);
     if (!is) {
-        cerr << "Cannot open input file " << file_name << endl;
+        std::cerr << "Cannot open input file " << file_name << endl;
         exit(1);
     }
 
@@ -338,7 +338,7 @@ const RA_Input::Division& RA_Input::GetDivisionByCode(const string& code) const 
                       [&](const Division& d) { return d.code == code; });
 
     if (it == divisionsData.end()) {
-        cerr << "Errore: Divisione con codice '" << code << "' non trovata.\n";
+        std::cerr << "Errore: Divisione con codice '" << code << "' non trovata.\n";
         exit(1);
     }
 
@@ -350,7 +350,7 @@ const RA_Input::Referee& RA_Input::GetRefereeByCode(const string& code) const {
                       [&](const Referee& r) { return r.code == code; });
 
     if (it == refereesData.end()) {
-        cerr << "Errore: Arbitro con codice '" << code << "' non trovato.\n";
+        std::cerr << "Errore: Arbitro con codice '" << code << "' non trovato.\n";
         exit(1);
     }
 
@@ -362,7 +362,7 @@ const RA_Input::Arena& RA_Input::GetArenaByCode(const string& code) const {
                       [&](const Arena& a) { return a.code == code; });
 
     if (arena == arenasData.end()) {
-        cerr << "Errore: Arena con codice '" << code << "' non trovata.\n";
+        std::cerr << "Errore: Arena con codice '" << code << "' non trovata.\n";
         exit(1);
     }
 
@@ -374,7 +374,7 @@ const RA_Input::Team& RA_Input::GetTeamByCode(const string& code) const {
                       [&](const Team& t) { return t.code == code; });
 
     if (it == teamsData.end()) {
-        cerr << "Errore: Team con codice '" << code << "' non trovato.\n";
+        std::cerr << "Errore: Team con codice '" << code << "' non trovato.\n";
         exit(1);
     }
 
@@ -414,13 +414,13 @@ RA_Output& RA_Output::operator=(const RA_Output& out){
 void RA_Output::AssignRefereeToGame(unsigned game_id, const string& referee_code) {
   // Check if game_id is within bounds
   if (game_id >= gameAssignments.size()) {
-    cerr << "Error: game_id " << game_id << " out of bounds" << endl;
+    std::cerr << "Error: game_id " << game_id << " out of bounds" << endl;
     return;
   }
 
   // Check if the referee_code is already assigned to this game
   if (find(gameAssignments[game_id].begin(), gameAssignments[game_id].end(), referee_code) != gameAssignments[game_id].end()) {
-    cerr << "Error: Referee '" << referee_code << "' is already assigned to game ID " << game_id << ".\n";
+    std::cerr << "Error: Referee '" << referee_code << "' is already assigned to game ID " << game_id << ".\n";
     return;
   }
 
@@ -521,7 +521,7 @@ bool RA_Output::CanAttendGame(const RA_Input::Referee& referee, const RA_Input::
 bool RA_Output::IsCompatibleWith(const RA_Input::Referee& ref, const vector<string>& selected_referees) const {
     for (const auto& other_code : selected_referees) {
         if(in.AreRefereesIncompatible(ref.code, other_code)){
-            cerr << "Incompatibility found: Referee " << ref.code << " is incompatible with referee " << other_code << ".\n";
+            std::cerr << "Incompatibility found: Referee " << ref.code << " is incompatible with referee " << other_code << ".\n";
             return false;
         }
     }
@@ -551,11 +551,11 @@ bool RA_Output::NumberOfReferees() const{
     }
 
     if (assigned_referees < min_referees) {
-      cerr << "Referees Number: Game " << g << " requires at least " << min_referees << " referees, but only " << assigned_referees << " are assigned.\n";
+      std::cerr << "Referees Number: Game " << g << " requires at least " << min_referees << " referees, but only " << assigned_referees << " are assigned.\n";
       return false;
     }
     if (assigned_referees > max_referees) {
-      cerr << "Referees Number: Game " << g << " requires at most " << max_referees << " referees, but " << assigned_referees << " are assigned.\n";
+      std::cerr << "Referees Number: Game " << g << " requires at most " << max_referees << " referees, but " << assigned_referees << " are assigned.\n";
       return false;
     }
   }
@@ -611,9 +611,9 @@ bool RA_Output::FeasibleDistance() const {
       float travel_time = in.TravelTimeBetweenArenas(prev_arena, curr_arena) * 60.0; // in minuti
 
       if (minutes_between < travel_time) {
-        cerr << "Feasible Distance: Referee " << referee.code << " cannot travel from game " << prev_game
-             << " to game " << curr_game << " in time. Required travel time: "
-             << travel_time << " minutes, available time: " << minutes_between << " minutes.\n";
+        // std::cerr << "Feasible Distance: Referee " << referee.code << " cannot travel from game " << prev_game
+        //      << " to game " << curr_game << " in time. Required travel time: "
+        //      << travel_time << " minutes, available time: " << minutes_between << " minutes.\n";
         return false;
       }
     }
@@ -659,9 +659,9 @@ bool RA_Output::RefereeAvailability() const {
       }
 
       if (!available) {
-        cerr << "Ref Availability: Referee " << referee.code << " is not available for game ID " << game_id
-             << " on " << put_time(&game_date, "%d/%m/%Y") << " at "
-             << put_time(&game_time, "%H:%M") << ".\n";
+        // std::cerr << "Ref Availability: Referee " << referee.code << " is not available for game ID " << game_id
+        //      << " on " << put_time(&game_date, "%d/%m/%Y") << " at "
+        //      << put_time(&game_time, "%H:%M") << ".\n";
         return false;
       }
     }
@@ -694,9 +694,9 @@ unsigned RA_Output::RefereeLevel() const {
             for (const auto& referee : in.refereesData) {
                 if (referee.code == referee_code) {
                     if (referee.level < required_level) {
-                        cerr << "Ref Level violation: Referee " << referee.code << " assigned to game " << g 
-                             << " does not meet the required level of " << required_level 
-                             << " - Referee level: " << referee.level << ".\n";
+                        // std::cerr << "Ref Level violation: Referee " << referee.code << " assigned to game " << g 
+                        //      << " does not meet the required level of " << required_level 
+                        //      << " - Referee level: " << referee.level << ".\n";
                         violations++;
                     }
                 }
@@ -724,8 +724,8 @@ unsigned RA_Output::ExperienceNeeded() const {
 
         // If the total experience is less than the required experience, count a violation
         if( total_experience < game.experience_required) {
-            cerr << "Experience violation: Game " << g << " requires at least " << game.experience_required 
-                 << " experience, but only " << total_experience << " is assigned.\n";
+            // std::cerr << "Experience violation: Game " << g << " requires at least " << game.experience_required 
+            //      << " experience, but only " << total_experience << " is assigned.\n";
             violations++;
         }
     }
@@ -754,9 +754,9 @@ unsigned RA_Output::GameDistribution() const {
     // Count the number of referees whose assigned games deviate from the mean by more than the standard deviation
     for (unsigned r = 0; r < in.Referees(); ++r) {
         if ( abs(games_per_referee[r] - mean_value) > ceil(std_dev) + 1) { // ceiling to allow for a small margin of error
-            cerr << "Game Distribution violation: Referee " << in.refereesData[r].code << " has " << games_per_referee[r] 
-                  << " games assigned, which deviates from the mean (" << mean_value 
-                  << ") by more than the standard deviation (" << ceil(std_dev) << ")\n";
+            // std::cerr << "Game Distribution violation: Referee " << in.refereesData[r].code << " has " << games_per_referee[r] 
+            //       << " games assigned, which deviates from the mean (" << mean_value 
+            //       << ") by more than the standard deviation (" << ceil(std_dev) << ")\n";
             violations++;
         }
     }
@@ -861,9 +861,9 @@ unsigned RA_Output::OptionalReferee() const {
         // Check if the number of assigned referees is less or equal to the minimum required
         // so there are no optional referees
         if(assigned_referees <= min_referees) {
-            cerr << "Optional Referee violation: Game " << g << " has " << assigned_referees 
-                 << " referees assigned, which is less than or equal to the minimum required of " 
-                 << min_referees << ".\n";
+            // std::cerr << "Optional Referee violation: Game " << g << " has " << assigned_referees 
+            //      << " referees assigned, which is less than or equal to the minimum required of " 
+            //      << min_referees << ".\n";
             violations++;
         }
     }
@@ -894,10 +894,10 @@ unsigned RA_Output::AssignmentFrequency() const {
         for (unsigned r = 0; r < in.Referees(); ++r) {
             if ( abs(teamAssignmentsPerReferee[r][t] - mean_team) > ceil(std_dev_team) + 1) { // ceiling to allow for a small margin of error
                 violations++;
-                cerr << "Assign Frequency violation: Referee " << in.refereesData[r].code << " is assigned to team " 
-                     << in.teamsData[t].code << " more often than the allowed threshold (mean + std_dev). "
-                     << "Assigned: " << teamAssignmentsPerReferee[r][t] 
-                     << ", Mean: " << mean_team << ", Std Dev: " << ceil(std_dev_team) << ".\n";
+                // std::cerr << "Assign Frequency violation: Referee " << in.refereesData[r].code << " is assigned to team " 
+                //      << in.teamsData[t].code << " more often than the allowed threshold (mean + std_dev). "
+                //      << "Assigned: " << teamAssignmentsPerReferee[r][t] 
+                //      << ", Mean: " << mean_team << ", Std Dev: " << ceil(std_dev_team) << ".\n";
             }
         }
     }
@@ -930,8 +930,8 @@ unsigned RA_Output::RefereeIncompatibility() const {
                 if (find(ref1.incompatible_referees.begin(), ref1.incompatible_referees.end(), ref2_code) != ref1.incompatible_referees.end() ||
                     find(ref2.incompatible_referees.begin(), ref2.incompatible_referees.end(), ref1_code) != ref2.incompatible_referees.end()) {
                     violations++;
-                    cerr << "Incompatibility Referee violation: Referee " << ref1_code << " and Referee " << ref2_code
-                         << " are assigned to game ID " << g << ".\n";
+                    // std::cerr << "Incompatibility Referee violation: Referee " << ref1_code << " and Referee " << ref2_code
+                    //      << " are assigned to game ID " << g << ".\n";
                 }
             }
         }
@@ -957,13 +957,13 @@ unsigned RA_Output::TeamIncompatibility() const {
             // Check if the referee is assigned to a game with incompatible teams
             if (in.IsRefereeIncompatibleWithTeam(ref.code, game.homeTeam_code)) {
                 violations++;
-                cerr << "Incompatibility Team violation: Referee " << ref_code << " is assigned to game ID " << g 
-                     << " with incompatible team: " << game.homeTeam_code << ".\n";
+                // std::cerr << "Incompatibility Team violation: Referee " << ref_code << " is assigned to game ID " << g 
+                //      << " with incompatible team: " << game.homeTeam_code << ".\n";
             }
             if (in.IsRefereeIncompatibleWithTeam(ref.code, game.guestTeam_code)) {
                 violations++;
-                cerr << "Incompatibility Team violation: Referee " << ref_code << " is assigned to game ID " << g 
-                     << " with incompatible team: " << game.guestTeam_code << ".\n";
+                // std::cerr << "Incompatibility Team violation: Referee " << ref_code << " is assigned to game ID " << g 
+                //      << " with incompatible team: " << game.guestTeam_code << ".\n";
             }
         }
     }
@@ -1041,7 +1041,7 @@ istream& operator>>(istream& is, RA_Output& out) {
       }
     }
     if (game_id == -1) {
-      cerr << "Errore: partita " << home << "-" << guest << " non trovata\n";
+      std::cerr << "Errore: partita " << home << "-" << guest << " non trovata\n";
       exit(1);
     }
 

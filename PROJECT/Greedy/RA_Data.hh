@@ -88,6 +88,10 @@ class RA_Input{
     unsigned divisions, referees, arenas, teams, games;
 
     float EuclideanDistance(const pair<float, float>& c1, const pair<float, float>& c2) const;
+    float ComputeDistancesBetweenArenas(Arena a1, Arena a2) const;
+    float ComputeDistancesBetweenArenasAndReferees(Arena a, Referee r) const;
+    float ComputeTravelTimeBetweenArenas(Arena a1, Arena a2) const;
+    float ComputeTravelTimeBetweenArenasAndReferee(Arena a, Referee r) const;
 };
 
 class RA_Output{
