@@ -724,7 +724,7 @@ unsigned RA_Output::GameDistribution() const {
 
     // Count the number of referees whose assigned games deviate from the mean by more than the standard deviation
     for (unsigned r = 0; r < in.Referees(); ++r) {
-        if ( abs(games_per_referee[r] - mean_value) > ceil(std_dev) + 1) { // ceiling to allow for a small margin of error
+        if ( abs(games_per_referee[r] - mean_value) > ceil(std_dev) + 1) { // ceiling to allow for a wide margin of error
             // std::cerr << "Game Distribution violation: Referee " << in.refereesData[r].code << " has " << games_per_referee[r] 
             //       << " games assigned, which deviates from the mean (" << mean_value 
             //       << ") by more than the standard deviation (" << ceil(std_dev) << ")\n";

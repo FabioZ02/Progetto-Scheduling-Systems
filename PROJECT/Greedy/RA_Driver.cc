@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
 
     if (in.Games() <= 50) // print the solution only if small enough
         cout << best_output << endl;
-    // cout << "Violations: " << best_output.ComputeViolations() << endl;
+    cout << "Violations: " << best_output.ComputeViolations() << endl;
     cout << "Cost: " << best_output.ComputeCost() << endl;
     cout << "Total distance: " << best_distance << " km" << endl << endl;
 
